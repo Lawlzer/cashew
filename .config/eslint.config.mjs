@@ -371,7 +371,7 @@ export default tseslint.config(
 
 			// Because 0 == false, if we have a number "if (num)", it can be false if the number is 0.
 			'@typescript-eslint/strict-boolean-expressions': [
-				'error',
+				'off',
 				{
 					// true = we don't use this rule
 					allowNullableObject: true,

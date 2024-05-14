@@ -20,10 +20,15 @@ struct rgb {
 };
 
 bool click(int x, int y, const string& windowTitle, int holdFor, int delayAfter, int clickCount, const string& button) {
-    HWND hwnd = FindWindowA(nullptr, windowTitle.c_str());
-    if (!hwnd) {
-        std::cout << "Window not found!" << std::endl;
-        return false;
+    HWND hwnd;
+    if (windowTitle.empty()) {
+        hwnd = GetDesktopWindow();
+    } else {
+        hwnd = FindWindowA(nullptr, windowTitle.c_str());
+        if (!hwnd) {
+            std::cout << "Window not found: " << windowTitle << std::endl;
+            return false;
+        }
     }
 
     POINT pt = {x, y};

@@ -1,4 +1,4 @@
-import { sleep } from '@lawlzer/utils';
+import { sleep, throwError } from '@lawlzer/utils';
 import bindings from 'bindings';
 const mouseAddon = bindings('mouse');
 
@@ -11,12 +11,12 @@ export class Mouse {
 		options.holdFor ??= 30;
 		options.delayAfter ??= 30;
 
-		const windowTitle = options?.windowTitle ?? ''; 
+		const windowTitle = options?.windowTitle ?? throwError(`click is not working without a windowTitle -- I will fix this <one day - maybe>, or if somebody makes an Issue`);
 		await mouseAddon.click(options.position.x, options.position.y, windowTitle, options.holdFor, options.delayAfter, options.clickCount, options.button);
 	}
 
 	public static async getPosition() {
-		const windowTitle = ''; 
+		const windowTitle = '';
 		return mouseAddon.getPosition(windowTitle);
 	}
 }

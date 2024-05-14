@@ -17,7 +17,7 @@
 HWND FindWindowByTitle(const std::string& title) {
     HWND hwnd = FindWindowA(NULL, title.c_str());
     if (hwnd == NULL) {
-        std::cout << "Window not found" << std::endl;
+        std::cout << "Window not found: " << title << std::endl;
     }
     return hwnd;
 }
@@ -32,27 +32,41 @@ Napi::Buffer<uint32_t> getWindowPixels(const Napi::CallbackInfo& info, const std
     
     HDC const hDc = GetDC(hwnd);
     HDC const hDcmem = CreateCompatibleDC(hDc);
-    HBITMAP const hBmp = CreateCompatibleBitmap(hDc, width, height);
+    HBITMAP const hBmp = CreateCompatibleBitmap(hDc, x + width, y + height);
     SelectObject(hDcmem, hBmp);
-      
+    
+    // We have to use PrintWindow here, because BitBlt doesn't work for background windows
+    if (!PrintWindow(hwnd, hDcmem, PW_RENDERFULLCONTENT)) {
+        throw Napi::Error::New(env, "PrintWindow failed");
+    }
+    
     BITMAPINFO bmi{};
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = width;
-    bmi.bmiHeader.biHeight = -height; // Negative to indicate a top-down DIB
+    bmi.bmiHeader.biWidth = x + width;
+    bmi.bmiHeader.biHeight = -(y + height); // fuck you fuck you fuck you
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
 
+    // Create a buffer to hold the entire captured image
+    std::vector<uint32_t> fullImageData((x + width) * (y + height));
+    if (!GetDIBits(hDcmem, hBmp, 0, y + height, fullImageData.data(), &bmi, DIB_RGB_COLORS)) {
+        throw Napi::Error::New(env, "GetDIBits failed");
+    }
+
+    // Create a buffer to hold the requested portion of the image
     Napi::Buffer<uint32_t> buffer = Napi::Buffer<uint32_t>::New(env, width * height);
     uint32_t* imageData = buffer.Data();
 
-    // Use PrintWindow to capture the window content even if it's in the background
-    if (!PrintWindow(hwnd, hDcmem, PW_RENDERFULLCONTENT)) {
-        throw Napi::Error::New(env, "PrintWindow failed");
-    }
-
-    if (!GetDIBits(hDcmem, hBmp, 0, height, imageData, &bmi, DIB_RGB_COLORS)) {
-        throw Napi::Error::New(env, "GetDIBits failed");
+    // Copy the relevant portion of the image data, taking stride into account
+	// This wouldn't be necessary, if we just used BitBlt -- but that doesn't work for background windows.
+    int fullStride = x + width;
+    for (int row = 0; row < height; ++row) {
+        for (int col = 0; col < width; ++col) {
+            int srcIndex = (row + y) * fullStride + (col + x);
+            int destIndex = row * width + col;
+            imageData[destIndex] = fullImageData[srcIndex];
+        }
     }
 
     // We are given BGRA format, so we must swap it ourselves

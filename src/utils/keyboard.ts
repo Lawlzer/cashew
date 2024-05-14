@@ -2,7 +2,12 @@ import { sleep, throwError } from '@lawlzer/utils';
 import bindings from 'bindings';
 const keyboardAddon = bindings('keyboard');
 
-export const keyAddonMap = {
+const keyAddonMap = {
+	// backspace: 8, // untested
+	tab: 9,
+	clear: 12,
+	enter: 13,
+	alt: 18,
 	'0': 48,
 	'1': 49,
 	'2': 50,
@@ -13,32 +18,33 @@ export const keyAddonMap = {
 	'7': 55,
 	'8': 56,
 	'9': 57,
-	A: 65,
-	B: 66,
-	C: 67,
-	D: 68,
-	E: 69,
-	F: 70,
-	G: 71,
-	H: 72,
-	I: 73,
-	J: 74,
-	K: 75,
-	L: 76,
-	M: 77,
-	N: 78,
-	O: 79,
-	P: 80,
-	Q: 81,
-	R: 82,
-	S: 83,
-	T: 84,
-	U: 85,
-	V: 86,
-	W: 87,
-	X: 88,
-	Y: 89,
-	Z: 90,
+	a: 65,
+	b: 66,
+	c: 67,
+	d: 68,
+	e: 69,
+	f: 70,
+	g: 71,
+	h: 72,
+	i: 73,
+	j: 74,
+	k: 75,
+	l: 76,
+	m: 77,
+	n: 78,
+	o: 79,
+	p: 80,
+	q: 81,
+	r: 82,
+	s: 83,
+	t: 84,
+	u: 85,
+	v: 86,
+	w: 87,
+	x: 88,
+	y: 89,
+	z: 90,
+	LeftWindowsKey: 91,
 	F1: 112,
 	F2: 113,
 	F3: 114,
@@ -68,8 +74,6 @@ export const keyAddonMap = {
 	cancel: 3,
 	middleClick: 4,
 	back: 8,
-	tab: 9,
-	clear: 12,
 	return: 13,
 	shift: 16,
 	control: 17,
@@ -77,6 +81,7 @@ export const keyAddonMap = {
 	pause: 19,
 	escape: 27,
 	space: 32,
+	' ': 32,
 	pageUp: 33,
 	pageDown: 34,
 	end: 35,
@@ -110,11 +115,22 @@ export const keyAddonMap = {
 	volumeMute: 173,
 	volumeDown: 174,
 	volumeUp: 175,
+	';': 184, // keyboard dependent?
+	maybeSemicolon: 184, // keyboard dependent?
+	'+': 187,
+	plus: 187,
+	',': 188,
+	comma: 188,
+	'-': 189,
+	dash: 189,
+	minus: 189,
+	'.': 190,
+	period: 190,
 } as const;
 export type Key = keyof typeof keyAddonMap;
 
 function keyToKeyCode(key: Key) {
-	return keyAddonMap[key] ?? throwError('key not found: ', key);
+	return keyAddonMap[key] ?? throwError(`keycode not found for key: ${key}`);
 }
 
 export class Keyboard {
@@ -126,17 +142,22 @@ export class Keyboard {
 		await keyboardAddon.releaseKey(keyToKeyCode(inputKey));
 	}
 
+	/**
+	 * May be useful, because holdKey + releaseKey internally works differently than Type, so it *may* be useful.
+	 */
 	public static async tapKey(inputKey: Key) {
 		await this.holdKey(inputKey);
 		await this.releaseKey(inputKey);
 	}
 
+	/**
+	 * Do I really need to explain what this function does?
+	 */
 	public static async holdKeyFor(inputKey: Key, holdFor: number) {
 		await this.holdKey(inputKey);
 		await sleep(holdFor);
 		await this.releaseKey(inputKey);
 	}
-
 
 	public static async isKeyPressed(key: Key): Promise<boolean> {
 		const result = keyboardAddon.isKeyPressed(keyToKeyCode(key));
@@ -150,9 +171,13 @@ export class Keyboard {
 		}
 	}
 
+	/**
+	 * Will not work for anything more than alphanumeric (a-z, 0-9) characters.
+	 */
 	public static async type(text: string, options?: { windowTitle?: string; delay?: number }) {
-		const windowTitle = options?.windowTitle ?? ''; 
+		const windowTitle = options?.windowTitle ?? '';
+		const keycodesArray = text.split('').map((char) => keyToKeyCode(char as Key));
 
-		await keyboardAddon.Type(text, windowTitle, options?.delay ?? 1);
+		await keyboardAddon.type(keycodesArray, windowTitle, options?.delay ?? 1);
 	}
 }
