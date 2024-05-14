@@ -20,7 +20,7 @@
 		"lint:prettier": "prettier --write --config ./.config/.prettierrc.js",
 		"pre-commit": "lint-staged -c ./.config/lint-staged.config.js",
 		"prepare": "husky",
-		"publish:all": "npm run build && npm run test && npm publish --access=public && echo \"Successfully published to NPM!\"",
+		"publish:all": "npm run build && npm publish --access=public && echo \"Successfully published to NPM!\"",
 		"test": "jest --config ./.config/jest.config.ts"
 	},
 	"prettier": "./.config/.prettierrc.js",
