@@ -3,7 +3,6 @@ import pluginJs from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import importPlugin from 'eslint-plugin-import';
-import fs from 'fs-extra';
 import path from 'path';
 
 const commit = false;

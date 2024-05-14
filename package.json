@@ -25,9 +25,7 @@
 	},
 	"prettier": "./.config/.prettierrc.js",
 	"dependencies": {
-		"@lawlzer/utils": "^3.4.15",
-		"bindings": "^1.5.0",
-		"fs-extra": "^11.2.0"
+		"@lawlzer/utils": "^3.4.15"
 	},
 	"devDependencies": {
 		"@lawlzer/prettier": "^0.0.4",
