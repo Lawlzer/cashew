@@ -1,0 +1,28 @@
+// This is the tsconfig used for ESLint
+// ESLint needs every linted file to be touched by the TSConfig.
+// I hate ESLint >.>
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {},
+	"include": [
+		"src", //
+		"tsconfig.json",
+		"tsconfig.eslint.json",
+		"tsconfig.build.json",
+		"package.json",
+		"package-lock.json",
+		"config/.eslintrc.commit.js",
+		"config/.eslintrc.js",
+		"config/.prettierrc.js",
+		"config/.swcrc",
+		"config/jest.config.ts",
+		"config/lint-staged.config.js",
+		"testUtils/testSetup.ts",
+		"testUtils/testTeardown.ts",
+		"testUtils/mongooseHandler.ts",
+		"scripts",
+		"**/*package.json",
+		"**/*package-lock.json"
+	],
+	"exclude": []
+}

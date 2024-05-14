@@ -1,0 +1,46 @@
+# Dependencies
+node_modules
+
+# Logs and dev output
+logs
+routeTypes
+
+# Package stuff
+bun.lockb
+package-*.json
+
+# Temporary caches
+*.tsbuildinfo
+caches
+cache
+lerna-debug.log
+zig-cache
+
+# Environment variables/secrets
+.env
+.env.development
+.env.production
+.env.test
+
+# Build / Generated output
+build
+dist
+lib
+output
+zig-out
+
+# Temporary/dev locations
+legacy
+temp
+tmp
+debug
+
+todo
+todo.txt
+
+serverOutput
+volume
+volumes
+
+# Specific to this project
+saves

@@ -1,0 +1,9 @@
+# Convert all line endings to LF, not CRLF, in Git
+* text=auto 
+
+* eol=LF
+
+# Ignore all files in configs for Linguist (GitHub's language detection software)
+config/* linguist-vendored
+.husky/* linguist-vendored
+.devcontainer/* linguist-vendored
