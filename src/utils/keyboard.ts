@@ -137,18 +137,18 @@ function keyToKeyCode(key: Key) {
 }
 
 export class Keyboard {
-	public static async holdKey(inputKey: Key) {
+	public static async holdKey(inputKey: Key): Promise<void> {
 		await keyboardAddon.holdKey(keyToKeyCode(inputKey));
 	}
 
-	public static async releaseKey(inputKey: Key) {
+	public static async releaseKey(inputKey: Key): Promise<void> {
 		await keyboardAddon.releaseKey(keyToKeyCode(inputKey));
 	}
 
 	/**
 	 * May be useful, because holdKey + releaseKey internally works differently than Type, so it *may* be useful.
 	 */
-	public static async tapKey(inputKey: Key) {
+	public static async tapKey(inputKey: Key): Promise<void> {
 		await this.holdKey(inputKey);
 		await this.releaseKey(inputKey);
 	}
@@ -156,7 +156,7 @@ export class Keyboard {
 	/**
 	 * Do I really need to explain what this function does?
 	 */
-	public static async holdKeyFor(inputKey: Key, holdFor: number) {
+	public static async holdKeyFor(inputKey: Key, holdFor: number): Promise<void> {
 		await this.holdKey(inputKey);
 		await sleep(holdFor);
 		await this.releaseKey(inputKey);
@@ -168,7 +168,7 @@ export class Keyboard {
 		return result;
 	}
 
-	public static async waitForKeyPress(key: Key, msDelayPerCheck = 10) {
+	public static async waitForKeyPress(key: Key, msDelayPerCheck = 10): Promise<void> {
 		while (!(await this.isKeyPressed(key))) {
 			await sleep(msDelayPerCheck);
 		}
@@ -177,7 +177,7 @@ export class Keyboard {
 	/**
 	 * Will not work for anything more than alphanumeric (a-z, 0-9) characters.
 	 */
-	public static async type(text: string, options?: { windowTitle?: string; delayPerKey?: number }) {
+	public static async type(text: string, options?: { windowTitle?: string; delayPerKey?: number }): Promise<void> {
 		const windowTitle = options?.windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
 
 		const keycodesArray = text.split('').map((char) => keyToKeyCode(char as Key));
