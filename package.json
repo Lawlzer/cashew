@@ -1,14 +1,21 @@
 {
 	"name": "@lawlzer/cashew",
-	"version": "0.0.2",
+	"version": "0.0.4",
 	"description": "A package for automating keyboard, mouse, screen, OCR, and clipboard interactions.",
 	"keywords": [],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/Lawlzer/cashew"
 	},
-	"license": "MIT",
+	"license": "ISC",
 	"author": "Lawlzer",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"src",
+		"build",
+		"dist"
+	],
 	"scripts": {
 		"build": "npm run clean && npm-run-all --parallel build:*",
 		"build:cpp": "node-gyp configure && node-gyp build",
@@ -25,11 +32,13 @@
 	},
 	"prettier": "./.config/.prettierrc.js",
 	"dependencies": {
-		"@lawlzer/utils": "^3.4.15"
+		"@lawlzer/utils": "^3.4.15",
+		"bindings": "^1.5.0"
 	},
 	"devDependencies": {
 		"@lawlzer/prettier": "^0.0.4",
 		"@types/bindings": "^1.5.5",
+		"@types/ms": "^0.7.34",
 		"@types/node": "^20.12.11",
 		"eslint": "^9.2.0",
 		"eslint-plugin-import": "^2.29.1",
