@@ -7,7 +7,7 @@ export class Clipboard {
 		return clipboardBinding.WriteClipboard(text);
 	}
 
-	public static async readText() {
+	public static async read() {
 		return clipboardBinding.ReadClipboard();
 	}
 
