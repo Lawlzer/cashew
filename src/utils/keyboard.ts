@@ -1,9 +1,12 @@
 import { sleep, throwError } from '@lawlzer/utils';
 import bindings from 'bindings';
+
+import { Config } from './config';
 const keyboardAddon = bindings('keyboard');
 
 const keyAddonMap = {
 	// backspace: 8, // untested
+	'\t': 9,
 	tab: 9,
 	clear: 12,
 	enter: 13,
@@ -130,7 +133,7 @@ const keyAddonMap = {
 export type Key = keyof typeof keyAddonMap;
 
 function keyToKeyCode(key: Key) {
-	return keyAddonMap[key] ?? throwError(`keycode not found for key: ${key}`);
+	return keyAddonMap[key] ?? throwError(`keycode not found for key: '${key}'`);
 }
 
 export class Keyboard {
@@ -174,10 +177,13 @@ export class Keyboard {
 	/**
 	 * Will not work for anything more than alphanumeric (a-z, 0-9) characters.
 	 */
-	public static async type(text: string, options?: { windowTitle?: string; delay?: number }) {
-		const windowTitle = options?.windowTitle ?? '';
+	public static async type(text: string, options?: { windowTitle?: string; delayPerKey?: number }) {
+		const windowTitle = options?.windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
+
 		const keycodesArray = text.split('').map((char) => keyToKeyCode(char as Key));
 
-		await keyboardAddon.type(keycodesArray, windowTitle, options?.delay ?? 1);
+		await keyboardAddon.type(keycodesArray, windowTitle, options?.delayPerKey ?? 1);
 	}
 }
+
+// todo make alll of this work for windowTitle

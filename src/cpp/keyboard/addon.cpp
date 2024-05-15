@@ -1,6 +1,9 @@
 #include <napi.h>
 #include <windows.h>
 #include <vector>
+#include <thread> 
+#include <chrono>
+#include <string>
 
 // Function that waits for a key press and returns true if the key is pressed
 bool IsKeyPressed(int key) {
@@ -29,11 +32,21 @@ void releaseKey(WORD keyCode) {
     SendInput(1, &input, sizeof(INPUT));
 }
 
-void typeKeys(const std::vector<WORD>& keyCodes) {
+void typeKeysWithDelay(const std::vector<WORD>& keyCodes, int delayPerKey) {
     for (WORD keyCode : keyCodes) {
         holdKey(keyCode);
         releaseKey(keyCode);
+        std::this_thread::sleep_for(std::chrono::milliseconds(delayPerKey));
     }
+}
+
+bool SetFocusToWindow(const std::string& windowTitle) {
+    HWND hwnd = FindWindowA(NULL, windowTitle.c_str());
+    if (hwnd == NULL) {
+        return false;
+    }
+    SetForegroundWindow(hwnd);
+    return true;
 }
 
 Napi::Value HoldKey(const Napi::CallbackInfo& info) {
@@ -75,17 +88,37 @@ Napi::Value IsKeyPressedMain(const Napi::CallbackInfo& info) {
     return Napi::Boolean::New(env, keyIsPressed);
 }
 
+void SendVirtualKey(HWND hWnd, UINT vkCode, int delay) {
+    PostMessage(hWnd, WM_KEYDOWN, vkCode, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(delay)); // Use the specified delay
+    PostMessage(hWnd, WM_KEYUP, vkCode, 0);
+}
+
+void SendText(HWND hWnd, const std::vector<WORD>& keyCodes, int delay) {
+    for (WORD keyCode : keyCodes) {
+        SendVirtualKey(hWnd, keyCode, delay);
+    }
+}
+
 Napi::Value Type(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
 
-    if (info.Length() < 1 || !info[0].IsArray()) {
-        Napi::TypeError::New(env, "Array of key codes expected").ThrowAsJavaScriptException();
+    // Expect 3 arguments: keycodesArray, windowTitle, and delay
+    if (info.Length() != 3) {
+        Napi::TypeError::New(env, "Expected exactly 3 arguments").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    if (!info[0].IsArray() || !info[1].IsString() || !info[2].IsNumber()) {
+        Napi::TypeError::New(env, "Expected arguments: keycodesArray (array), windowTitle (string), delayPerKey (number)").ThrowAsJavaScriptException();
         return env.Null();
     }
 
     Napi::Array keyArray = info[0].As<Napi::Array>();
-    std::vector<WORD> keyCodes;
+    std::string windowTitle = info[1].As<Napi::String>().Utf8Value();
+    int delay = info[2].As<Napi::Number>().Uint32Value(); // Parse the delay as an integer
 
+    std::vector<WORD> keyCodes;
     for (uint32_t i = 0; i < keyArray.Length(); i++) {
         Napi::Maybe<Napi::Value> maybeKeyValue = keyArray.Get(i);
         if (maybeKeyValue.IsNothing() || !maybeKeyValue.Unwrap().IsNumber()) {
@@ -95,9 +128,19 @@ Napi::Value Type(const Napi::CallbackInfo& info) {
         keyCodes.push_back(maybeKeyValue.Unwrap().As<Napi::Number>().Uint32Value());
     }
 
-    typeKeys(keyCodes);
+    HWND hwnd;
+    if (!windowTitle.empty()) {
+        hwnd = FindWindowA(nullptr, windowTitle.c_str());
+        if (!hwnd) {
+            return Napi::Boolean::New(env, false);
+        }
+    } else {
+        hwnd = GetForegroundWindow();
+    }
 
-    return env.Null();
+    SendText(hwnd, keyCodes, delay);
+
+    return Napi::Boolean::New(env, true);
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {

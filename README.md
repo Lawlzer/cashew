@@ -47,7 +47,7 @@ console.log(mousePosition); // { x: 100, y: 200 }
 ```typescript
 import { Screen, Image } from '@lawlzer/cashew';
 // Capture a portion of the screen
-const image = await Screen.initFromScreen('window-title-goes-here', 0, 0, 1920, 1080);
+const image = await Screen.initFromScreen(0, 0, 1920, 1080, 'window-title-goes-here');
 
 await image.writeToFile('screenshot.png'); // Save image to file
 
@@ -83,6 +83,12 @@ console.log(text);
 ### MISC/Utilities
 
 - Most utilities are secretly sync, but I made all of them async, incase that is changed in the future. Most utilities take sub-1ms to run, so it's not actually an issue, except for maybe some Screen/Image utilities.
+- There is a "setProcessConfig" utility, which will automatically set the windowTitle (for all relevant utilities), so it's not repeated across the codebase.
+
+```typescript
+import { Config } from '@lawlzer/cashew';
+Config.setProcessConfig({ windowTitle: undefined });
+```
 
 - If you're using this package to write macros, I'd _highly_ recommend running the following utility on startup (press pgDown to "panic" shutdown the script)
 

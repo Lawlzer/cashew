@@ -37,9 +37,9 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 	await Keyboard.type('1'); // shift + 1 -> !
 	await sleep('1s');
 
-	const originalClipboardText = await Clipboard.readText();
+	const originalClipboardText = await Clipboard.read();
 	await Clipboard.write('\nFrom clipboard - Hello, World!');
-	console.log(await Clipboard.readText());
+	console.log(await Clipboard.read());
 	await Clipboard.paste();
 
 	await Clipboard.write(originalClipboardText); // restore our original clipboard text
@@ -60,7 +60,7 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 	let start = Date.now();
 	let runCount1920x1080 = 0;
 	while (Date.now() - start < ms('1s')) {
-		await Screen.initFromScreen('showcase.ts - cashew - Cursor', 0, 0, 1920, 1080);
+		await Screen.initFromScreen(0, 0, 1920, 1080, 'showcase.ts - cashew - Cursor');
 		runCount1920x1080++;
 	}
 	console.info(`Average time to get 1920x1080 pixels: ${(Date.now() - start) / runCount1920x1080}ms`);
@@ -69,7 +69,7 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 	let runCount1x1 = 0;
 	start = Date.now();
 	while (Date.now() - start < ms('1s')) {
-		await Screen.initFromScreen('showcase.ts - cashew - Cursor', 0, 0, 1, 1);
+		await Screen.initFromScreen(0, 0, 1, 1, 'showcase.ts - cashew - Cursor');
 		runCount1x1++;
 	}
 	console.info(`Average time to get 1x1 pixels: ${(Date.now() - start) / runCount1x1}ms`);
@@ -81,7 +81,7 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 
 	start = Date.now();
 	while (Date.now() - start < ms('5s')) {
-		const image = await Screen.initFromScreen('Movies & TV', 90, 75, 430, 450);
+		const image = await Screen.initFromScreen(90, 75, 430, 450, 'Movies & TV');
 		await image.writeToFile('test.png'); // writeToFile is not built for speed (~1s for 1920x1080)
 	}
 
