@@ -99,7 +99,7 @@ export class Screen {
 	}
 
 	public static async initFromScreen(x: number, y: number, width: number, height: number, windowTitle?: string): Promise<Image> {
-		const realWindowTitle = windowTitle ?? Config.getProcessConfig().windowTitle ?? throwError(`initFromScreen requires a windowTitle - Either from setProcessConfig, or from the function args itself.`);
+		const realWindowTitle = windowTitle ?? Config.getProcessConfig().windowTitle;
 		const image = await this.getScreen(x, y, width, height, realWindowTitle);
 		return new Image(image, width, height);
 	}
@@ -114,10 +114,10 @@ export class Screen {
 		return new Image(buffer, width, height);
 	}
 
-	private static async getScreen(x: number, y: number, width: number, height: number, windowTitle: string): Promise<Buffer> {
+	private static async getScreen(x: number, y: number, width: number, height: number, windowTitle?: string): Promise<Buffer> {
 		if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') throwError('Incorrect types passed in.');
 
-		const realWindowTitle = windowTitle ?? Config.getProcessConfig().windowTitle ?? throwError(`getScreen requires a windowTitle - Either from setProcessConfig, or from the function args itself.`);
+		const realWindowTitle = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
 		const result: Buffer = await screenAddon.getScreenPixels(realWindowTitle, x, y, width, height);
 		if (!Buffer.isBuffer(result)) throwError('Result is not a buffer');
 

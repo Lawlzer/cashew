@@ -1,5 +1,5 @@
-#ifndef CLIPBOARD_UTILS_H
-#define CLIPBOARD_UTILS_H
+#ifndef CLIPBOARD_H
+#define CLIPBOARD_H
 
 #include <napi.h>
 

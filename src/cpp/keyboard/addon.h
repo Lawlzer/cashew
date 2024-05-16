@@ -1,6 +1,6 @@
 
-#ifndef KEY_UTILS_H
-#define KEY_UTILS_H
+#ifndef KEYBOARD_H
+#define KEYBOARD_H
 
 #include <napi.h>
 

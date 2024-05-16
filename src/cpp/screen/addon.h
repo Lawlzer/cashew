@@ -1,8 +1,8 @@
-#ifndef GET_SCREEN_PIXELS_H
-#define GET_SCREEN_PIXELS_H
+#ifndef SCREEN_H
+#define SCREEN_H
 
 #include <napi.h>
 
-Napi::Value GetScreenPixelsMain(const Napi::CallbackInfo& info);
+Napi::Value GetWindowPixelsMain(const Napi::CallbackInfo& info);
 
 #endif
