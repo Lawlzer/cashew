@@ -46,6 +46,7 @@ console.log(mousePosition); // { x: 100, y: 200 }
 
 ```typescript
 import { Screen, Image } from '@lawlzer/cashew';
+
 // Capture a portion of the screen
 const image = await Screen.initFromScreen(0, 0, 1920, 1080, 'window-title-goes-here');
 
@@ -55,6 +56,8 @@ const pixelColor = await image.getPixel(50, 50); // Get pixel color
 console.log(pixelColor);
 
 const imageFromFile = await Screen.initFromFile('screenshot.png'); // Read the image from a file
+
+const singleScreenPixelEasy = await Screen.getSingleScreenPixel(100, 200, 'window-title-goes-here'); // get the pixel at 100, 200
 ```
 
 ### Clipboard

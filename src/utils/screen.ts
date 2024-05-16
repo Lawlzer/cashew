@@ -92,13 +92,11 @@ export class Image {
 }
 
 export class Screen {
-	// public static async getSingleScreenPixel(windowTitle: string, x: number, y: number): Promise<rgb> {
-	// 	const image = await this.getScreen(windowTitle, x, y, 1, 1);
-	// 	const r = image.readUInt8(0);
-	// 	const g = image.readUInt8(1);
-	// 	const b = image.readUInt8(2);
-	// 	return { r, g, b };
-	// }
+	public static async getSingleScreenPixel(x: number, y: number, windowTitle?: string): Promise<rgb> {
+		const image = await this.initFromScreen(x, y, 1, 1, windowTitle);
+		const pixel = await image.getPixel(0, 0);
+		return pixel;
+	}
 
 	public static async initFromScreen(x: number, y: number, width: number, height: number, windowTitle?: string): Promise<Image> {
 		const realWindowTitle = windowTitle ?? Config.getProcessConfig().windowTitle ?? throwError(`initFromScreen requires a windowTitle - Either from setProcessConfig, or from the function args itself.`);
