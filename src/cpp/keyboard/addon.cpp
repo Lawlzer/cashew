@@ -96,7 +96,7 @@ void SendVirtualKey(HWND hWnd, UINT vkCode, int delay) {
 
 void SendText(HWND hWnd, const std::vector<WORD>& keyCodes, int delay) {
     for (WORD keyCode : keyCodes) {
-        SendVirtualKey(hWnd, keyCode, delay);
+        PostMessage(hWnd, WM_CHAR, keyCode, 0);
     }
 }
 
