@@ -7,14 +7,14 @@ interface GetTextOptions {
 
 let cachedWorker: Worker;
 export class Ocr {
-	public async getText(imagePath: string, options?: GetTextOptions): Promise<string> {
+	public static async getText(imagePath: string, options?: GetTextOptions): Promise<string> {
 		await this.ensureWorkerExists(options);
 
 		const ret = await cachedWorker!.recognize(imagePath);
 		return ret.data.text.trim();
 	}
 
-	private async ensureWorkerExists(options?: GetTextOptions): Promise<void> {
+	private static async ensureWorkerExists(options?: GetTextOptions): Promise<void> {
 		if (!cachedWorker) {
 			cachedWorker = await createWorker('eng');
 			await cachedWorker.setParameters({
