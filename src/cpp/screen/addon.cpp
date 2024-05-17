@@ -84,7 +84,7 @@ Napi::Buffer<uint32_t> getWindowPixels(const Napi::CallbackInfo& info, const std
     return buffer;
 }
 
-Napi::Value GetScreenPixelsMain(const Napi::CallbackInfo& info) {
+Napi::Value GetWindowPixelsMain(const Napi::CallbackInfo& info) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
     Napi::Env env = info.Env();
 
@@ -104,10 +104,80 @@ Napi::Value GetScreenPixelsMain(const Napi::CallbackInfo& info) {
     return colors;
 }
 
+
+Napi::Buffer<uint32_t> getScreenPixels(const Napi::CallbackInfo& info, int x, int y, int width, int height) {
+    Napi::Env env = info.Env();
+    
+    HWND hwnd = GetDesktopWindow(); // todo questionmark this hsouldn't be the issue but maybe?
+	// https://github.com/Lawlzer/macros/blob/f8205121cc21534d1eb9c49f7d193d49d67915b1/src/cpp/getScreenPixels/index.cpp
+
+    if (hwnd == NULL) {
+        throw Napi::Error::New(env, "Window not found");
+    }
+    
+    HDC const hDc = GetDC(hwnd);
+    HDC const hDcmem = CreateCompatibleDC(hDc);
+    HBITMAP const hBmp = CreateCompatibleBitmap(hDc, width, height);
+    SelectObject(hDcmem, hBmp);
+      
+    BITMAPINFO bmi{};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = width;
+    bmi.bmiHeader.biHeight = -height; // fuck you fuck you fuck you fuck you
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+	Napi::Buffer<uint32_t> buffer = Napi::Buffer<uint32_t>::New(env, width * height);
+    uint32_t* imageData = buffer.Data();
+
+    BitBlt(hDcmem, 0, 0, width, height, hDc, x, y, SRCCOPY);
+
+    if (!GetDIBits(hDcmem, hBmp, 0, height, imageData, &bmi, DIB_RGB_COLORS)) {
+        throw Napi::Error::New(env, "GetDIBits failed");
+    }
+
+	// We are given BGRA format, so we must swap it ourselves
+    for (int i = 0; i < width * height; i++) {
+        uint32_t pixel = imageData[i];
+        uint32_t r = (pixel & 0x00FF0000) >> 16;
+        uint32_t b = (pixel & 0x000000FF) << 16;
+        imageData[i] = (pixel & 0xFF00FF00) | r | b;
+    }
+
+    DeleteObject(hBmp);
+    DeleteDC(hDcmem);
+    ReleaseDC(hwnd, hDc);
+
+    return buffer;
+}
+
+Napi::Value GetScreenPixelsMain(const Napi::CallbackInfo& info) {
+	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
+    Napi::Env env = info.Env();
+
+    if (info.Length() != 4) {
+        throw Napi::TypeError::New(env, "Expected 4 arguments");
+    }
+
+    int x = info[0].As<Napi::Number>().Int32Value();
+    int y = info[1].As<Napi::Number>().Int32Value();
+    int width = info[2].As<Napi::Number>().Int32Value();
+    int height = info[3].As<Napi::Number>().Int32Value();
+    
+    auto colors = getScreenPixels(info, x, y, width, height);
+
+    return colors;
+}
+
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
+    exports.Set(Napi::String::New(env, "getWindowPixels"),
+                Napi::Function::New(env, GetWindowPixelsMain));
     exports.Set(Napi::String::New(env, "getScreenPixels"),
                 Napi::Function::New(env, GetScreenPixelsMain));
     return exports;
 }
 
 NODE_API_MODULE(NODE_GYP_MODULE_NAME, Init)
+

@@ -117,10 +117,16 @@ export class Screen {
 	private static async getScreen(x: number, y: number, width: number, height: number, windowTitle?: string): Promise<Buffer> {
 		if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') throwError('Incorrect types passed in.');
 
-		const realWindowTitle = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
-		const result: Buffer = await screenAddon.getScreenPixels(realWindowTitle, x, y, width, height);
-		if (!Buffer.isBuffer(result)) throwError('Result is not a buffer');
+		const realWindowTitle = windowTitle ?? Config.getProcessConfig().windowTitle;
 
+		if (realWindowTitle) {
+			const result: Buffer = await screenAddon.getWindowPixels(realWindowTitle, x, y, width, height);
+			if (!Buffer.isBuffer(result)) throwError('Result is not a buffer');
+			return result;
+		}
+
+		const result: Buffer = await screenAddon.getScreenPixels(x, y, width, height);
+		if (!Buffer.isBuffer(result)) throwError('Result is not a buffer');
 		return result;
 	}
 }
