@@ -19,17 +19,12 @@ struct rgb {
     unsigned int r, g, b;
 };
 
-bool click(int x, int y, const string& windowTitle, int holdFor, int delayAfter, int clickCount, const string& button) {
-    HWND hwnd;
-    if (windowTitle.empty()) {
-        hwnd = GetDesktopWindow();
-    } else {
-        hwnd = FindWindowA(nullptr, windowTitle.c_str());
-        if (!hwnd) {
-            std::cout << "Window not found: " << windowTitle << std::endl;
-            return false;
-        }
-    }
+bool click(Napi::Env env, int x, int y, const string& windowTitle, int holdFor, int delayAfter, int clickCount, const string& button) {
+    HWND hwnd = FindWindowA(nullptr, windowTitle.c_str());
+	if (!hwnd) {
+		throw Napi::TypeError::New(env, "Could not find the window: " + windowTitle);
+	}
+    
 
     POINT pt = {x, y};
     ClientToScreen(hwnd, &pt);
@@ -62,7 +57,43 @@ Napi::Value clickNapi(const Napi::CallbackInfo& info) {
     int clickCount = info[5].As<Napi::Number>().Int32Value();
     string button = info[6].As<Napi::String>().Utf8Value();
 
-    bool result = click(x, y, windowTitle, holdFor, delayAfter, clickCount, button); 
+    bool result = click(env, x, y, windowTitle, holdFor, delayAfter, clickCount, button); 
+
+    return Napi::Boolean::New(env, result);
+}
+
+bool clickDesktop(int x, int y, int holdFor, int delayAfter, int clickCount, const string& button) {
+    HWND hwnd = GetDesktopWindow();
+    POINT pt = {x, y};
+    ClientToScreen(hwnd, &pt);
+    DWORD downFlag = (button == "right") ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_LEFTDOWN;
+    DWORD upFlag = (button == "right") ? MOUSEEVENTF_RIGHTUP : MOUSEEVENTF_LEFTUP;
+
+    for (int i = 0; i < clickCount; i++) {
+        SetCursorPos(pt.x, pt.y);
+        mouse_event(downFlag, pt.x, pt.y, 0, 0);
+        std::this_thread::sleep_for(std::chrono::milliseconds(holdFor));
+        mouse_event(upFlag, pt.x, pt.y, 0, 0);
+        std::this_thread::sleep_for(std::chrono::milliseconds(delayAfter));
+    }
+    return true;
+}
+
+Napi::Value clickDesktopNapi(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    if (info.Length() < 6) {
+        throw Napi::TypeError::New(env, "Expected 6 arguments");
+    }
+
+    int x = info[0].As<Napi::Number>().Int32Value();
+    int y = info[1].As<Napi::Number>().Int32Value();
+    int holdFor = info[2].As<Napi::Number>().Int32Value();
+    int delayAfter = info[3].As<Napi::Number>().Int32Value();
+    int clickCount = info[4].As<Napi::Number>().Int32Value();
+    string button = info[5].As<Napi::String>().Utf8Value();
+
+    bool result = clickDesktop(x, y, holdFor, delayAfter, clickCount, button);
 
     return Napi::Boolean::New(env, result);
 }
@@ -83,6 +114,7 @@ Napi::Value getPosition(const Napi::CallbackInfo& info) {
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "click"), Napi::Function::New(env, clickNapi));
     exports.Set(Napi::String::New(env, "getPosition"), Napi::Function::New(env, getPosition));
+    exports.Set(Napi::String::New(env, "clickDesktop"), Napi::Function::New(env, clickDesktopNapi));
     return exports;
 }
 
