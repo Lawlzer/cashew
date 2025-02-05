@@ -1,75 +1,50 @@
-import globals from 'globals';
-import pluginJs from '@eslint/js';
+import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import simpleImportSort from 'eslint-plugin-simple-import-sort';
-import importPlugin from 'eslint-plugin-import';
 import path from 'path';
-
+import process from 'process';
+import importPlugin from 'eslint-plugin-import';
 const commit = false;
 
-// const ignores = [
-// 	//
-// 	'**/node_modules',
-
-// 	'**/logs',
-// 	'**/routeTypes',
-
-// 	'**/build',
-// 	'**/dist',
-// 	'**/lib',
-// 	'**/output',
-
-// 	'**/cache',
-// 	'**/caches',
-// 	'**/.tsbuildinfo',
-
-// 	'**/zig-out',
-// 	'**/zig-cache',
-
-// 	'**/legacy',
-// 	'**/temp',
-// 	'**/tmp',
-// 	'**/debug',
-
-// 	'**/serverOutput',
-
-// 	'**/volume',
-// 	'**/volumes',
-
-// 	'**/.env*',
-// ];
+console.log(`process.env.LINT_STAGED: ${process.env.LINT_STAGED}`);
+console.log(`process.env.LINT_STAGED_CUSTOM: ${process.env.LINT_STAGED_CUSTOM}`);
+console.log(`process.env.HUSKY: ${process.env.HUSKY}`);
+console.log(`!!process.env.GIT_PARAMS: ${!!process.env.GIT_PARAMS}`);
 
 export default tseslint.config(
-	// {
-	// 	languageOptions: { globals: globals.node },
-	// },
-	// pluginJs.configs.recommended,
-	// ...tseslint.configs.recommended,
 	{
-		files: ['**/*.ts'],
-		// ignores: ignores,
+		// Global ignores
+		ignores: ['dist', 'build', 'node_modules', 'logs', 'cache', 'caches', 'temp', 'tmp', 'debug', 'todo', 'serverOutput', 'public'],
+	},
+	eslint.configs.recommended,
+	// Use a basic non-type-checked config for JS/MJS files
+	{
+		files: ['**/*.js', '**/*.mjs'],
+		extends: [tseslint.configs.recommended],
+	},
+	// Use type-checked config for TS files
+	{
+		files: ['**/*.ts', '**/*.tsx'],
+		extends: [tseslint.configs.recommendedTypeChecked],
+		plugins: {
+			// '@typescript-eslint': tseslint, // todo
+			import: importPlugin,
+			// 'unused-imports': unusedImports,
+		},
 		languageOptions: {
-			parser: tseslint.parser,
 			parserOptions: {
-				// project: true,
-				project: path.resolve(process.cwd(), 'tsconfig.eslint.json'),
+				allowDefaultProject: ['*.mjs', '*.js'],
+				defaultProject: true,
+				tsconfigRootDir: process.cwd(),
+				project: [path.resolve(process.cwd(), 'tsconfig.json')],
+				ecmaFeatures: {},
 				sourceType: 'module',
 				ecmaVersion: 'latest',
 			},
-			globals: {},
-		},
-		// extends: [pluginJs.configs.recommended, ...tseslint.configs.recommended],
-		// languageOptions: { globals: globals.node },
-		// plugins: {
-		// 	// '@typescript-eslint': tseslint,
-		// },
-		plugins: {
-			'@typescript-eslint': tseslint.plugin,
-			'simple-import-sort': simpleImportSort,
-			import: importPlugin,
 		},
 		rules: {
 			strict: 2,
+
+			'@typescript-eslint/unbound-method': 'off', // experimental
 
 			// Disallow all "var" usage
 			'no-var': commit ? 'error' : 'off',
@@ -78,14 +53,11 @@ export default tseslint.config(
 			// Do not allow variables and types to share <the exact same> name
 			'@typescript-eslint/no-redeclare': ['error'],
 
-			// // EXPERIMENTAL - Overloads must be ordered from most -> least specific
-			// '@typescript-eslint/adjacent-overload-signatures': 'error',
+			// EXPERIMENTAL - Overloads must be ordered from most -> least specific
+			'@typescript-eslint/adjacent-overload-signatures': 'error',
 
-			// // Use T[], instead of Array<T>
-			// '@typescript-eslint/array-type': ['error'],
-
-			// // Disallow the "bad" default types, e.g "String", "Boolean", "Number", "Function"
-			// '@typescript-eslint/ban-types': ['error'],
+			// Use T[], instead of Array<T>
+			'@typescript-eslint/array-type': ['error'],
 
 			// Disallow interfaces -> only use types, or always use interfaces when possible
 			// '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
@@ -103,8 +75,8 @@ export default tseslint.config(
 			// var!!!!!.maybeExists
 			'@typescript-eslint/no-extra-non-null-assertion': ['error'],
 
-			// Allow classes with only static methods
-			'@typescript-eslint/no-extraneous-class': ['off'],
+			// ? Something about classes
+			'@typescript-eslint/no-extraneous-class': ['error'],
 
 			// Using explicit types when they can be inferred
 			// '@typescript-eslint/no-inferrable-types': ['error', ],
@@ -233,9 +205,6 @@ export default tseslint.config(
 			// don't use ts-lint:disable (because this is not TSLint)
 			'@typescript-eslint/ban-tslint-comment': ['error'],
 
-			// Bracing indentation (new line, or current line)
-			'@typescript-eslint/brace-style': ['error'],
-
 			// When using New Set/Map, prefer arguments on the left side, or right
 			'@typescript-eslint/consistent-generic-constructors': ['error'],
 
@@ -264,32 +233,28 @@ export default tseslint.config(
 			// Classes with two+ of the same name (two getters name "foo")
 			'@typescript-eslint/no-dupe-class-members': ['error'],
 
-			// 'import/first': 'error',
-			// 'import/newline-after-import': 'error',
-			// 'import/no-duplicates': 'error',
+			// disallow console.log *in production only*, but allow other console methods (console.info, console.error, etc)
+			'no-console': ['error', { allow: ['info', 'warn', 'error', 'debug', 'trace', commit ? 'N/A this is ignored' : 'log'] }],
 
-			'simple-import-sort/imports': 'error',
-			'simple-import-sort/exports': 'error',
+			// Only one import per file -- the autofix for this does not seem to work
+			'import/no-duplicates': [
+				'off',
+				// 'error',
+				// {
+				// 	'prefer-inline': true,
+				// 	considerQueryString: true,
+				// },
+			],
 
-			// // Only one import per file -- the autofix for this does not seem to work
-			// 'simple-import-sort/no-duplicates': [
-			// 	'off',
-			// 	// 'error',
-			// 	// {
-			// 	// 	'prefer-inline': true,
-			// 	// 	considerQueryString: true,
-			// 	// },
-			// ],
-
-			// 'simple-import-sort/extensions': [
-			// 	'error',
-			// 	'never',
-			// 	{
-			// 		pattern: {
-			// 			// 'json': 'always'
-			// 		},
-			// 	},
-			// ],
+			'import/extensions': [
+				'error',
+				'never',
+				{
+					pattern: {
+						// 'json': 'always'
+					},
+				},
+			],
 
 			// Don't use for *in* loops on arrays, use for *of*
 			'@typescript-eslint/no-for-in-array': ['error'],
@@ -327,9 +292,6 @@ export default tseslint.config(
 
 			// If the variable "foo" is declared in file scope, this stops a function from also declaring a local variable named "foo"
 			'@typescript-eslint/no-shadow': ['error'],
-
-			// "throw 'text'" statements, must always throw new Error()
-			'@typescript-eslint/no-throw-literal': ['error'],
 
 			// An enum property can reference a property in the same enum. This rule errors with an unnecessary qualifier
 			'@typescript-eslint/no-unnecessary-qualifier': ['error'],
@@ -370,7 +332,7 @@ export default tseslint.config(
 
 			// Because 0 == false, if we have a number "if (num)", it can be false if the number is 0.
 			'@typescript-eslint/strict-boolean-expressions': [
-				'off',
+				'error',
 				{
 					// true = we don't use this rule
 					allowNullableObject: true,
@@ -538,17 +500,18 @@ export default tseslint.config(
 			'unused-imports/no-unused-imports': commit ? 'error' : 'off',
 			'unused-imports/no-unused-vars': commit ? ['error', { vars: 'all', varsIgnorePattern: '^_', args: 'after-used', argsIgnorePattern: '^_' }] : 'off',
 			// '@typescript-eslint/no-unused-vars': ['error', { vars: 'all', args: 'none', ignoreRestSiblings: false }],
+
+			// // Import stuff
+			// 'simple-import-sort/imports': 'error',
+			// 'simple-import-sort/exports': 'error',
+
+			// // These have seemingly been removed from TypeScript-ESLint? But they're still in the Documentation...
+			// // "throw 'text'" statements, must always throw new Error()
+			// '@typescript-eslint/no-throw-literal': ['error'],
+			// // Bracing indentation (new line, or current line)
+			// '@typescript-eslint/brace-style': ['error'],
+			// // Disallow the "bad" default types, e.g "String", "Boolean", "Number", "Function"
+			// '@typescript-eslint/ban-types': ['error'],
 		},
 	}
-
-	// {
-	// 	files: ['**/*.js'],
-	// 	plugins: {
-	// 		jsdoc: jsdoc,
-	// 	},
-	// 	rules: {
-	// 		'jsdoc/require-description': 'error',
-	// 		'jsdoc/check-values': 'error',
-	// 	},
-	// },
 );
