@@ -137,20 +137,22 @@ function keyToKeyCode(key: Key) {
 }
 
 export class Keyboard {
-	public static async holdKey(inputKey: Key): Promise<void> {
-		await keyboardAddon.holdKey(keyToKeyCode(inputKey));
+	public static async holdKey(inputKey: Key, windowTitle?: string): Promise<void> {
+		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
+		await keyboardAddon.holdKey(keyToKeyCode(inputKey), windowTitleFinal);
 	}
 
-	public static async releaseKey(inputKey: Key): Promise<void> {
-		await keyboardAddon.releaseKey(keyToKeyCode(inputKey));
+	public static async releaseKey(inputKey: Key, windowTitle?: string): Promise<void> {
+		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
+		await keyboardAddon.releaseKey(keyToKeyCode(inputKey), windowTitleFinal);
 	}
 
 	/**
 	 * May be useful, because holdKey + releaseKey internally works differently than Type, so it *may* be useful.
 	 */
-	public static async tapKey(inputKey: Key): Promise<void> {
-		await this.holdKey(inputKey);
-		await this.releaseKey(inputKey);
+	public static async tapKey(inputKey: Key, windowTitle?: string): Promise<void> {
+		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
+		await keyboardAddon.tapKey(keyToKeyCode(inputKey), windowTitleFinal);
 	}
 
 	/**
@@ -163,7 +165,7 @@ export class Keyboard {
 	}
 
 	public static async isKeyPressed(key: Key): Promise<boolean> {
-		const result = keyboardAddon.isKeyPressed(keyToKeyCode(key));
+		const result = await keyboardAddon.isKeyPressed(keyToKeyCode(key));
 		if (typeof result !== 'boolean') throwError('result was not a boolean: ', result);
 		return result;
 	}
