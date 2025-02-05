@@ -27,7 +27,7 @@ Napi::Buffer<uint32_t> getWindowPixels(const Napi::CallbackInfo& info, const std
     
     HWND hwnd = FindWindowByTitle(windowTitle);
     if (hwnd == NULL) {
-        throw Napi::Error::New(env, "Window not found");
+        Napi::Error::New(env, "Window not found").ThrowAsJavaScriptException();
     }
     
     HDC const hDc = GetDC(hwnd);
@@ -37,7 +37,7 @@ Napi::Buffer<uint32_t> getWindowPixels(const Napi::CallbackInfo& info, const std
     
     // We have to use PrintWindow here, because BitBlt doesn't work for background windows
     if (!PrintWindow(hwnd, hDcmem, PW_RENDERFULLCONTENT)) {
-        throw Napi::Error::New(env, "PrintWindow failed");
+        Napi::Error::New(env, "PrintWindow failed").ThrowAsJavaScriptException();
     }
     
     BITMAPINFO bmi{};
@@ -51,7 +51,7 @@ Napi::Buffer<uint32_t> getWindowPixels(const Napi::CallbackInfo& info, const std
     // Create a buffer to hold the entire captured image
     std::vector<uint32_t> fullImageData((x + width) * (y + height));
     if (!GetDIBits(hDcmem, hBmp, 0, y + height, fullImageData.data(), &bmi, DIB_RGB_COLORS)) {
-        throw Napi::Error::New(env, "GetDIBits failed");
+        Napi::Error::New(env, "GetDIBits failed");
     }
 
     // Create a buffer to hold the requested portion of the image
@@ -90,7 +90,7 @@ Napi::Value GetWindowPixelsMain(const Napi::CallbackInfo& info) {
 
     // Expecting 5 parameters: windowTitle, x, y, width, height
     if (info.Length() != 5) {
-        throw Napi::TypeError::New(env, "Expected 5 arguments");
+        Napi::Error::New(env, "Expected 5 arguments").ThrowAsJavaScriptException();
     }
 
     std::string windowTitle = info[0].As<Napi::String>().Utf8Value();
@@ -112,7 +112,7 @@ Napi::Buffer<uint32_t> getScreenPixels(const Napi::CallbackInfo& info, int x, in
 	// https://github.com/Lawlzer/macros/blob/f8205121cc21534d1eb9c49f7d193d49d67915b1/src/cpp/getScreenPixels/index.cpp
 
     if (hwnd == NULL) {
-        throw Napi::Error::New(env, "Window not found");
+        Napi::Error::New(env, "Window not found");
     }
     
     HDC const hDc = GetDC(hwnd);
@@ -134,7 +134,7 @@ Napi::Buffer<uint32_t> getScreenPixels(const Napi::CallbackInfo& info, int x, in
     BitBlt(hDcmem, 0, 0, width, height, hDc, x, y, SRCCOPY);
 
     if (!GetDIBits(hDcmem, hBmp, 0, height, imageData, &bmi, DIB_RGB_COLORS)) {
-        throw Napi::Error::New(env, "GetDIBits failed");
+        Napi::Error::New(env, "GetDIBits failed");
     }
 
 	// We are given BGRA format, so we must swap it ourselves
@@ -157,7 +157,7 @@ Napi::Value GetScreenPixelsMain(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
 
     if (info.Length() != 4) {
-        throw Napi::TypeError::New(env, "Expected 4 arguments");
+        Napi::Error::New(env, "Expected 4 arguments").ThrowAsJavaScriptException();
     }
 
     int x = info[0].As<Napi::Number>().Int32Value();
