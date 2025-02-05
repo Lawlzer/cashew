@@ -3,12 +3,8 @@ import tseslint from 'typescript-eslint';
 import path from 'path';
 import process from 'process';
 import importPlugin from 'eslint-plugin-import';
-const commit = false;
 
-console.log(`process.env.LINT_STAGED: ${process.env.LINT_STAGED}`);
-console.log(`process.env.LINT_STAGED_CUSTOM: ${process.env.LINT_STAGED_CUSTOM}`);
-console.log(`process.env.HUSKY: ${process.env.HUSKY}`);
-console.log(`!!process.env.GIT_PARAMS: ${!!process.env.GIT_PARAMS}`);
+const commit = process.env.LINT_STAGED_CUSTOM === 'true';
 
 export default tseslint.config(
 	{
@@ -76,7 +72,7 @@ export default tseslint.config(
 			'@typescript-eslint/no-extra-non-null-assertion': ['error'],
 
 			// ? Something about classes
-			'@typescript-eslint/no-extraneous-class': ['error'],
+			'@typescript-eslint/no-extraneous-class': ['off'],
 
 			// Using explicit types when they can be inferred
 			// '@typescript-eslint/no-inferrable-types': ['error', ],
@@ -236,25 +232,25 @@ export default tseslint.config(
 			// disallow console.log *in production only*, but allow other console methods (console.info, console.error, etc)
 			'no-console': ['error', { allow: ['info', 'warn', 'error', 'debug', 'trace', commit ? 'N/A this is ignored' : 'log'] }],
 
-			// Only one import per file -- the autofix for this does not seem to work
-			'import/no-duplicates': [
-				'off',
-				// 'error',
-				// {
-				// 	'prefer-inline': true,
-				// 	considerQueryString: true,
-				// },
-			],
+			// // Only one import per file -- the autofix for this does not seem to work
+			// 'import/no-duplicates': [
+			// 	'off',
+			// 	// 'error',
+			// 	// {
+			// 	// 	'prefer-inline': true,
+			// 	// 	considerQueryString: true,
+			// 	// },
+			// ],
 
-			'import/extensions': [
-				'error',
-				'never',
-				{
-					pattern: {
-						// 'json': 'always'
-					},
-				},
-			],
+			// 'import/extensions': [
+			// 	'error',
+			// 	'never',
+			// 	{
+			// 		pattern: {
+			// 			// 'json': 'always'
+			// 		},
+			// 	},
+			// ],
 
 			// Don't use for *in* loops on arrays, use for *of*
 			'@typescript-eslint/no-for-in-array': ['error'],
@@ -497,8 +493,8 @@ export default tseslint.config(
 			// no-unused-vars must be off, as these do that rule but better (with autofixing)
 			'no-unused-vars': 'off',
 			'@typescript-eslint/no-unused-vars': ['off'], // I'm not sure if this rule has to be off as well, but we will leave it off to be safe.
-			'unused-imports/no-unused-imports': commit ? 'error' : 'off',
-			'unused-imports/no-unused-vars': commit ? ['error', { vars: 'all', varsIgnorePattern: '^_', args: 'after-used', argsIgnorePattern: '^_' }] : 'off',
+			// 'unused-imports/no-unused-imports': commit ? 'error' : 'off',
+			// 'unused-imports/no-unused-vars': commit ? ['error', { vars: 'all', varsIgnorePattern: '^_', args: 'after-used', argsIgnorePattern: '^_' }] : 'off',
 			// '@typescript-eslint/no-unused-vars': ['error', { vars: 'all', args: 'none', ignoreRestSiblings: false }],
 
 			// // Import stuff
