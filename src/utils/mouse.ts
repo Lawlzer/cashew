@@ -2,7 +2,7 @@ import { sleep, throwError } from '@lawlzer/utils';
 import bindings from 'bindings';
 const mouseAddon = bindings('mouse');
 
-import type { Position } from '.';
+import type { Position } from './misc';
 import { Config } from './config';
 
 export class Mouse {

@@ -15,33 +15,40 @@ bool IsKeyPressed(int key) {
 }
 
 void holdKey(WORD keyCode, const std::string& windowTitle = "") {
-    HWND hwnd = GetForegroundWindow(); // Default to foreground window
+    HWND hwnd = GetForegroundWindow();
     
     if (!windowTitle.empty()) {
         hwnd = FindWindowA(nullptr, windowTitle.c_str());
         if (!hwnd) {
-            // Just return if window not found - error handling happens in the Node-API wrapper
             return;
         }
     }
     
-    // Use SendMessage instead of PostMessage for more reliable delivery
-    SendMessage(hwnd, WM_KEYDOWN, keyCode, 0);
+    // Create and send a key press input
+    INPUT input = {0};
+    input.type = INPUT_KEYBOARD;
+    input.ki.wVk = keyCode;
+    
+    SendInput(1, &input, sizeof(INPUT));
 }
 
 void releaseKey(WORD keyCode, const std::string& windowTitle = "") {
-    HWND hwnd = GetForegroundWindow(); // Default to foreground window
+    HWND hwnd = GetForegroundWindow();
     
     if (!windowTitle.empty()) {
         hwnd = FindWindowA(nullptr, windowTitle.c_str());
         if (!hwnd) {
-            // If window not found, throw an error or handle appropriately
             return;
         }
     }
     
-    // Use SendMessage instead of PostMessage for more reliable delivery
-    SendMessage(hwnd, WM_KEYUP, keyCode, 0);
+    // Create and send a key release input
+    INPUT input = {0};
+    input.type = INPUT_KEYBOARD;
+    input.ki.wVk = keyCode;
+    input.ki.dwFlags = KEYEVENTF_KEYUP;
+    
+    SendInput(1, &input, sizeof(INPUT));
 }
 
 void typeKeysWithDelay(const std::vector<WORD>& keyCodes, int delayPerKey) {
@@ -52,17 +59,8 @@ void typeKeysWithDelay(const std::vector<WORD>& keyCodes, int delayPerKey) {
     }
 }
 
-bool SetFocusToWindow(const std::string& windowTitle) {
-    HWND hwnd = FindWindowA(NULL, windowTitle.c_str());
-    if (hwnd == NULL) {
-        return false;
-    }
-    SetForegroundWindow(hwnd);
-    return true;
-}
-
 void tapKey(WORD keyCode, const std::string& windowTitle = "") {
-    HWND hwnd = GetForegroundWindow(); // Default to foreground window
+    HWND hwnd = GetForegroundWindow();
     
     if (!windowTitle.empty()) {
         hwnd = FindWindowA(nullptr, windowTitle.c_str());
@@ -71,10 +69,19 @@ void tapKey(WORD keyCode, const std::string& windowTitle = "") {
         }
     }
     
-    // Use SendMessage for reliability and add longer delay between down/up
-    SendMessage(hwnd, WM_KEYDOWN, keyCode, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(15)); // Increased from 10ms to 50ms
-    SendMessage(hwnd, WM_KEYUP, keyCode, 0);
+    
+    INPUT inputs[2] = {0};
+    
+    // Key press
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki.wVk = keyCode;
+    
+    // Key release
+    inputs[1].type = INPUT_KEYBOARD;
+    inputs[1].ki.wVk = keyCode;
+    inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
+    
+    SendInput(2, inputs, sizeof(INPUT));
 }
 
 Napi::Value HoldKey(const Napi::CallbackInfo& info) {
@@ -108,6 +115,7 @@ Napi::Value ReleaseKey(const Napi::CallbackInfo& info) {
 
     if (info.Length() < 1 || !info[0].IsNumber()) {
         Napi::Error::New(env, "Expected keyCode as first argument").ThrowAsJavaScriptException();
+        return env.Null();
     }
 
     WORD keyCode = info[0].As<Napi::Number>().Uint32Value();
@@ -115,6 +123,13 @@ Napi::Value ReleaseKey(const Napi::CallbackInfo& info) {
     
     if (info.Length() > 1 && info[1].IsString()) {
         windowTitle = info[1].As<Napi::String>().Utf8Value();
+        
+        // Add window existence check
+        HWND hwnd = FindWindowA(nullptr, windowTitle.c_str());
+        if (!hwnd) {
+            Napi::Error::New(env, "Window not found").ThrowAsJavaScriptException();
+            return env.Null();
+        }
     }
 
     releaseKey(keyCode, windowTitle);
@@ -142,14 +157,14 @@ Napi::Value IsKeyPressedMain(const Napi::CallbackInfo& info) {
 
 // todo PostMesge -> SendMessage
 void SendVirtualKey(HWND hWnd, UINT vkCode, int delay) {
-    PostMessage(hWnd, WM_KEYDOWN, vkCode, 0);
+    SendMessage(hWnd, WM_KEYDOWN, vkCode, 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(delay)); // Use the specified delay
-    PostMessage(hWnd, WM_KEYUP, vkCode, 0);
+    SendMessage(hWnd, WM_KEYUP, vkCode, 0);
 }
 
 void SendText(HWND hWnd, const std::vector<WORD>& keyCodes, int delay) {
     for (WORD keyCode : keyCodes) {
-        PostMessage(hWnd, WM_CHAR, keyCode, 0);
+        SendMessage(hWnd, WM_CHAR, keyCode, 0);
     }
 }
 

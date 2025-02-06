@@ -137,12 +137,18 @@ function keyToKeyCode(key: Key) {
 }
 
 export class Keyboard {
+	/**
+	 * WARNING: Seems to be relatively inconsistent in background windows.
+	 */
 	public static async holdKey(inputKey: Key, windowTitle?: string): Promise<void> {
 		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
 		await keyboardAddon.holdKey(keyToKeyCode(inputKey), windowTitleFinal);
 	}
 
-	public static async releaseKey(inputKey: Key, windowTitle?: string): Promise<void> {
+	/**
+	 * WARNING: Requires it to be the Foreground window. Does not seem to be possible to release keys in background windows.
+	 */
+	public static async releaseKeyDesktop(inputKey: Key, windowTitle?: string): Promise<void> {
 		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
 		await keyboardAddon.releaseKey(keyToKeyCode(inputKey), windowTitleFinal);
 	}
@@ -156,12 +162,12 @@ export class Keyboard {
 	}
 
 	/**
-	 * Do I really need to explain what this function does?
+	 * WARNING: Does not seem to work in background windows?
 	 */
 	public static async holdKeyFor(inputKey: Key, holdFor: number): Promise<void> {
 		await this.holdKey(inputKey);
 		await sleep(holdFor);
-		await this.releaseKey(inputKey);
+		await this.releaseKeyDesktop(inputKey);
 	}
 
 	public static async isKeyPressed(key: Key): Promise<boolean> {

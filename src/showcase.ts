@@ -23,7 +23,7 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 	// Win + R
 	await Keyboard.holdKey('LeftWindowsKey');
 	await Keyboard.tapKey('r');
-	await Keyboard.releaseKey('LeftWindowsKey');
+	await Keyboard.releaseKeyDesktop('LeftWindowsKey');
 	await sleep('1s');
 
 	// Open Notepad
@@ -39,7 +39,6 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 
 	const originalClipboardText = await Clipboard.read();
 	await Clipboard.write('\nFrom clipboard - Hello, World!');
-	console.log(await Clipboard.read());
 	await Clipboard.paste();
 
 	await Clipboard.write(originalClipboardText); // restore our original clipboard text
@@ -87,7 +86,6 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 
 	const inputImage = await Screen.initFromFile('white.jpg');
 	const pixelColours = await inputImage.getPixel(50, 50);
-	console.log(`pixelColours: ${JSON.stringify(pixelColours, null, 2)}`);
 	await inputImage.writeToFile('test.png');
 	await sleep('1s');
 
@@ -125,7 +123,7 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 			await inputImage.setPixel(x, y, black);
 		}
 	}
-	console.log(`Time taken to draw a giant, unoptimized circle: ${Date.now() - start}ms`);
+	console.info(`Time taken to draw a giant, unoptimized circle: ${Date.now() - start}ms`);
 	await inputImage.writeToFile('test.png');
 
 	await Mouse.click({ button: 'left', position: { x: 1739, y: 800 }, windowTitle: 'OBS 30.0.2 - Profile: Untitled - Scenes: Untitled' });
