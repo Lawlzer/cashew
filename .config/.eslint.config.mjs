@@ -330,7 +330,11 @@ export default tseslint.config(
 			'@typescript-eslint/strict-boolean-expressions': [
 				'error',
 				{
-					// true = we don't use this rule
+					allowNullableString: false, // '' == false
+					allowNullableNumber: false, // 0 == false
+
+					allowNullableEnum: true, // idk
+
 					allowNullableObject: true,
 					allowAny: true,
 				},
