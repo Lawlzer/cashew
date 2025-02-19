@@ -4,14 +4,18 @@ const clipboardBinding = bindings('clipboard') ?? throwError('Could not load cli
 
 export class Clipboard {
 	public static async write(text: string): Promise<void> {
-		return clipboardBinding.WriteClipboard(text);
+		const result = await clipboardBinding.WriteClipboard(text);
+		if (typeof result !== 'undefined') throwError(`result is not undefined: ${result}`);
 	}
 
 	public static async read(): Promise<string> {
-		return clipboardBinding.ReadClipboard() ?? '';
+		const result = await clipboardBinding.ReadClipboard();
+		if (typeof result !== 'string') throwError(`result is not a string: ${result}`);
+		return result;
 	}
 
 	public static async paste(): Promise<void> {
-		return clipboardBinding.ClipboardPaste();
+		const result = await clipboardBinding.ClipboardPaste();
+		if (typeof result !== 'undefined') throwError(`result is not undefined: ${result}`);
 	}
 }

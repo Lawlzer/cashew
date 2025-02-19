@@ -81,12 +81,12 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 	start = Date.now();
 	while (Date.now() - start < ms('5s')) {
 		const image = await Screen.initFromScreen(90, 75, 430, 450, 'Movies & TV');
-		await image.writeToFile('test.png'); // writeToFile is not built for speed (~1s for 1920x1080)
+		await image.saveToFile('test.png'); // writeToFile is not built for speed (~1s for 1920x1080)
 	}
 
 	const inputImage = await Screen.initFromFile('white.jpg');
 	const pixelColours = await inputImage.getPixel(50, 50);
-	await inputImage.writeToFile('test.png');
+	await inputImage.saveToFile('test.png');
 	await sleep('1s');
 
 	// We could iterate on the inputImage (and we will, there's no downside in this example)
@@ -100,7 +100,7 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 			for (let y = -radius; y <= radius; y++) {
 				for (let x = -radius; x <= radius; x++) {
 					if (x * x + y * y <= radius * radius) {
-						await image.setPixel(centerX + x, centerY + y, color);
+						await image.setPixelColour(centerX + x, centerY + y, color);
 					}
 				}
 			}
@@ -120,11 +120,11 @@ import { Clipboard, Keyboard, Mouse, Ocr, Screen } from '.';
 		// Draw the mouth
 		for (let x = 30; x <= 70; x++) {
 			const y = 70 + Math.floor(10 * Math.sin((x - 30) * (Math.PI / 40)));
-			await inputImage.setPixel(x, y, black);
+			await inputImage.setPixelColour(x, y, black);
 		}
 	}
 	console.info(`Time taken to draw a giant, unoptimized circle: ${Date.now() - start}ms`);
-	await inputImage.writeToFile('test.png');
+	await inputImage.saveToFile('test.png');
 
 	await Mouse.click({ button: 'left', position: { x: 1739, y: 800 }, windowTitle: 'OBS 30.0.2 - Profile: Untitled - Scenes: Untitled' });
 	await sleep('1d');

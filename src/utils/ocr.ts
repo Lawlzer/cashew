@@ -15,7 +15,7 @@ export class Ocr {
 	}
 
 	private static async ensureWorkerExists(options?: GetTextOptions): Promise<void> {
-		if (!cachedWorker) {
+		if (cachedWorker != null) {
 			cachedWorker = await createWorker('eng');
 			await cachedWorker.setParameters({
 				tessedit_char_whitelist: options?.characterWhitelist ?? undefined,

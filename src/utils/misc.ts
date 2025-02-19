@@ -2,7 +2,7 @@ import { throwError } from '@lawlzer/utils';
 import bindings from 'bindings';
 import { Keyboard } from './keyboard';
 import type { Key } from './keyboard';
-import type { rgb } from './screen';
+import type { Area, rgb, Screen } from './screen';
 
 const miscBinding = bindings('misc') ?? throwError('Could not load misc binding');
 
@@ -56,4 +56,27 @@ export function isCorrectColour(pixel1: rgb, pixel2: rgb, maxOffset: number) {
 	const bOffset = Math.abs(pixel1.b - pixel2.b);
 
 	return rOffset <= maxOffset && gOffset <= maxOffset && bOffset <= maxOffset;
+}
+
+/**
+ * Turn an array of positions into an x, y, width, and height.
+ */
+export function getAreaOfPositions(positions: Position[]): Area {
+	let xMin = positions[0].x;
+	let xMax = positions[0].x;
+	let yMin = positions[0].y;
+	let yMax = positions[0].y;
+
+	for (let i = 1; i < positions.length; i++) {
+		const position = positions[i];
+		xMin = Math.min(xMin, position.x);
+		xMax = Math.max(xMax, position.x);
+		yMin = Math.min(yMin, position.y);
+		yMax = Math.max(yMax, position.y);
+	}
+
+	const width = xMax - xMin;
+	const height = yMax - yMin;
+
+	return { x: xMin, y: yMin, width, height };
 }

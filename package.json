@@ -1,6 +1,6 @@
 {
 	"name": "@lawlzer/cashew",
-	"version": "0.0.10",
+	"version": "0.0.11",
 	"description": "A package for automating keyboard, mouse, screen, OCR, and clipboard interactions.",
 	"keywords": [],
 	"repository": {
