@@ -5,7 +5,7 @@ const clipboardBinding = bindings('clipboard') ?? throwError('Could not load cli
 export class Clipboard {
 	public static async write(text: string): Promise<void> {
 		const result = await clipboardBinding.WriteClipboard(text);
-		if (typeof result !== 'undefined') throwError(`result is not undefined: ${result}`);
+		if (result !== undefined && result !== true) throwError(`Invalid result: ${result}`);
 	}
 
 	public static async read(): Promise<string> {
@@ -16,6 +16,6 @@ export class Clipboard {
 
 	public static async paste(): Promise<void> {
 		const result = await clipboardBinding.ClipboardPaste();
-		if (typeof result !== 'undefined') throwError(`result is not undefined: ${result}`);
+		if (result !== undefined && result !== true) throwError(`Invalid result: ${result}`);
 	}
 }

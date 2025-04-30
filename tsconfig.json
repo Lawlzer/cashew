@@ -119,6 +119,7 @@
 		"dist",
 		".env",
 		"scripts",
-		"routeTypes"
+		"routeTypes",
+		"showcase.ts"
 	]
 }

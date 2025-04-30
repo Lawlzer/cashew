@@ -5,43 +5,59 @@
 #include <chrono>
 #include <string>
 
-// Function that waits for a key press and returns true if the key is pressed
-bool IsKeyPressed(int key) {
-    if (GetAsyncKeyState(key) & 0x8000) { // 0x8000 is the bit flag for a key currently pressed
-        // Key is pressed; return true
-        return true;
-    }
-    return false;
-}
+Napi::Value HoldKey(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
 
-void holdKey(WORD keyCode, const std::string& windowTitle = "") {
-    HWND hwnd = GetForegroundWindow();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        Napi::Error::New(env, "Expected keyCode as first argument").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    WORD keyCode = info[0].As<Napi::Number>().Uint32Value();
+    std::string windowTitle = "";
+    HWND hwnd = GetForegroundWindow(); // Default to foreground window
     
-    if (!windowTitle.empty()) {
+    if (info.Length() > 1 && info[1].IsString()) {
+        windowTitle = info[1].As<Napi::String>().Utf8Value();
         hwnd = FindWindowA(nullptr, windowTitle.c_str());
         if (!hwnd) {
-            return;
+            Napi::Error::New(env, "Window not found").ThrowAsJavaScriptException();
+            return env.Null();
         }
     }
-    
+
     // Create and send a key press input
     INPUT input = {0};
     input.type = INPUT_KEYBOARD;
     input.ki.wVk = keyCode;
     
     SendInput(1, &input, sizeof(INPUT));
+    return env.Null();
 }
 
-void releaseKey(WORD keyCode, const std::string& windowTitle = "") {
-    HWND hwnd = GetForegroundWindow();
-    
-    if (!windowTitle.empty()) {
+Napi::Value ReleaseKey(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        Napi::Error::New(env, "Expected keyCode as first argument").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    WORD keyCode = info[0].As<Napi::Number>().Uint32Value();
+    std::string windowTitle = "";
+    HWND hwnd = GetForegroundWindow(); // Default to foreground window
+
+    if (info.Length() > 1 && info[1].IsString()) {
+        windowTitle = info[1].As<Napi::String>().Utf8Value();
         hwnd = FindWindowA(nullptr, windowTitle.c_str());
         if (!hwnd) {
-            return;
+             // If a window title was provided but not found, throw an error
+            Napi::Error::New(env, "Window not found").ThrowAsJavaScriptException();
+            return env.Null();
         }
+        // No need to SetForegroundWindow for release
     }
-    
+
     // Create and send a key release input
     INPUT input = {0};
     input.type = INPUT_KEYBOARD;
@@ -49,24 +65,120 @@ void releaseKey(WORD keyCode, const std::string& windowTitle = "") {
     input.ki.dwFlags = KEYEVENTF_KEYUP;
     
     SendInput(1, &input, sizeof(INPUT));
+    return env.Null();
 }
 
-void typeKeysWithDelay(const std::vector<WORD>& keyCodes, int delayPerKey) {
-    for (WORD keyCode : keyCodes) {
-        holdKey(keyCode);
-        releaseKey(keyCode);
-        std::this_thread::sleep_for(std::chrono::milliseconds(delayPerKey));
+Napi::Value IsKeyPressedMain(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    // Check number of arguments
+    if (info.Length() < 1) {
+        Napi::Error::New(env, "Key code expected").ThrowAsJavaScriptException();
+        return env.Null(); // Return null on error
     }
+
+    if (!info[0].IsNumber()) {
+        Napi::Error::New(env, "Key code must be a number").ThrowAsJavaScriptException();
+        return env.Null(); // Return null on error
+    }
+
+    int keyToDetect = info[0].As<Napi::Number>().Int32Value();
+
+    // Directly use GetAsyncKeyState
+    bool keyIsPressed = (GetAsyncKeyState(keyToDetect) & 0x8000) != 0;
+
+    return Napi::Boolean::New(env, keyIsPressed);
 }
 
-void tapKey(WORD keyCode, const std::string& windowTitle = "") {
-    HWND hwnd = GetForegroundWindow();
-    
+// todo PostMesge -> SendMessage
+// Removed SendVirtualKey function (as it wasn't exported or used by exported functions)
+
+// Removed SendText function
+
+Napi::Value Type(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    // Expect 3 arguments: keycodesArray, windowTitle, and delay (delay is currently unused but kept for API compatibility)
+    if (info.Length() != 3) {
+        Napi::Error::New(env, "Expected exactly 3 arguments: keycodesArray, windowTitle, delayPerKey").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    if (!info[0].IsArray() || !info[1].IsString() || !info[2].IsNumber()) {
+        Napi::Error::New(env, "Expected arguments: keycodesArray (array), windowTitle (string), delayPerKey (number)").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    Napi::Array keyArray = info[0].As<Napi::Array>();
+    std::string windowTitle = info[1].As<Napi::String>().Utf8Value();
+    int delay = info[2].As<Napi::Number>().Uint32Value(); // Parse the delay, though it's not used here
+
+    std::vector<WORD> keyCodes;
+    for (uint32_t i = 0; i < keyArray.Length(); i++) {
+        // Correct Napi::Maybe handling
+        Napi::Maybe<Napi::Value> maybeVal = keyArray.Get(i);
+        if (maybeVal.IsNothing()) {
+             // Handle the case where getting the element failed, maybe log or throw
+             Napi::Error::New(env, "Failed to get array element").ThrowAsJavaScriptException();
+             return env.Null(); 
+        }
+        Napi::Value val = maybeVal.Unwrap(); // Unwrap the value now that we know it's safe
+
+        if (!val.IsNumber()) {
+             Napi::Error::New(env, "Key code must be a number").ThrowAsJavaScriptException();
+             return env.Null(); // Return null on error
+        }
+        keyCodes.push_back(val.As<Napi::Number>().Uint32Value());
+    }
+
+    HWND hwnd;
     if (!windowTitle.empty()) {
         hwnd = FindWindowA(nullptr, windowTitle.c_str());
         if (!hwnd) {
-            return;
+            // Return false if window not found, consistent with original behavior
+            return Napi::Boolean::New(env, false); 
         }
+    } else {
+        hwnd = GetForegroundWindow();
+    }
+
+    // Integrate SendText logic here
+    for (WORD keyCode : keyCodes) {
+        // Using SendMessage with WM_CHAR as SendText did. 
+        // Note: This sends characters, not virtual key presses/releases.
+        // It also doesn't use the 'delay' parameter.
+        SendMessage(hwnd, WM_CHAR, keyCode, 0); 
+        // If a delay IS needed between WM_CHAR messages, it could be added here:
+        // if (delay > 0) {
+        //    std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+        // }
+    }
+
+    return Napi::Boolean::New(env, true);
+}
+
+Napi::Value TapKey(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        Napi::Error::New(env, "Expected keyCode as first argument").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    WORD keyCode = info[0].As<Napi::Number>().Uint32Value();
+    std::string windowTitle = "";
+    HWND hwnd = GetForegroundWindow(); // Default to foreground window
+    
+    if (info.Length() > 1 && info[1].IsString()) {
+        windowTitle = info[1].As<Napi::String>().Utf8Value();
+        hwnd = FindWindowA(nullptr, windowTitle.c_str());
+        if (!hwnd) {
+            // If a window title was provided but not found, throw an error
+            Napi::Error::New(env, "Window not found").ThrowAsJavaScriptException();
+            return env.Null();
+        }
+         // Optionally bring the target window to the foreground
+         // SetForegroundWindow(hwnd);
     }
     
     
@@ -82,154 +194,6 @@ void tapKey(WORD keyCode, const std::string& windowTitle = "") {
     inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
     
     SendInput(2, inputs, sizeof(INPUT));
-}
-
-Napi::Value HoldKey(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-
-    if (info.Length() < 1 || !info[0].IsNumber()) {
-        Napi::Error::New(env, "Expected keyCode as first argument").ThrowAsJavaScriptException();
-        return env.Null();
-    }
-
-    WORD keyCode = info[0].As<Napi::Number>().Uint32Value();
-    std::string windowTitle = "";
-    
-    if (info.Length() > 1 && info[1].IsString()) {
-        windowTitle = info[1].As<Napi::String>().Utf8Value();
-        
-        // Check if window exists before calling holdKey
-        HWND hwnd = FindWindowA(nullptr, windowTitle.c_str());
-        if (!hwnd) {
-            Napi::Error::New(env, "Window not found").ThrowAsJavaScriptException();
-            return env.Null();
-        }
-    }
-
-    holdKey(keyCode, windowTitle);
-    return env.Null();
-}
-
-Napi::Value ReleaseKey(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-
-    if (info.Length() < 1 || !info[0].IsNumber()) {
-        Napi::Error::New(env, "Expected keyCode as first argument").ThrowAsJavaScriptException();
-        return env.Null();
-    }
-
-    WORD keyCode = info[0].As<Napi::Number>().Uint32Value();
-    std::string windowTitle = "";
-    
-    if (info.Length() > 1 && info[1].IsString()) {
-        windowTitle = info[1].As<Napi::String>().Utf8Value();
-        
-        // Add window existence check
-        HWND hwnd = FindWindowA(nullptr, windowTitle.c_str());
-        if (!hwnd) {
-            Napi::Error::New(env, "Window not found").ThrowAsJavaScriptException();
-            return env.Null();
-        }
-    }
-
-    releaseKey(keyCode, windowTitle);
-    return env.Null();
-}
-
-Napi::Value IsKeyPressedMain(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-
-    // Check number of arguments
-    if (info.Length() < 1) {
-        Napi::Error::New(env, "Key code expected").ThrowAsJavaScriptException();
-    }
-
-    if (!info[0].IsNumber()) {
-        Napi::Error::New(env, "Key code must be a number").ThrowAsJavaScriptException();
-    }
-
-    int keyToDetect = info[0].As<Napi::Number>().Int32Value();
-
-    bool keyIsPressed = IsKeyPressed(keyToDetect);
-
-    return Napi::Boolean::New(env, keyIsPressed);
-}
-
-// todo PostMesge -> SendMessage
-void SendVirtualKey(HWND hWnd, UINT vkCode, int delay) {
-    SendMessage(hWnd, WM_KEYDOWN, vkCode, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(delay)); // Use the specified delay
-    SendMessage(hWnd, WM_KEYUP, vkCode, 0);
-}
-
-void SendText(HWND hWnd, const std::vector<WORD>& keyCodes, int delay) {
-    for (WORD keyCode : keyCodes) {
-        SendMessage(hWnd, WM_CHAR, keyCode, 0);
-    }
-}
-
-Napi::Value Type(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-
-    // Expect 3 arguments: keycodesArray, windowTitle, and delay
-    if (info.Length() != 3) {
-        Napi::Error::New(env, "Expected exactly 3 arguments").ThrowAsJavaScriptException();
-    }
-
-    if (!info[0].IsArray() || !info[1].IsString() || !info[2].IsNumber()) {
-        Napi::Error::New(env, "Expected arguments: keycodesArray (array), windowTitle (string), delayPerKey (number)").ThrowAsJavaScriptException();
-    }
-
-    Napi::Array keyArray = info[0].As<Napi::Array>();
-    std::string windowTitle = info[1].As<Napi::String>().Utf8Value();
-    int delay = info[2].As<Napi::Number>().Uint32Value(); // Parse the delay as an integer
-
-    std::vector<WORD> keyCodes;
-    for (uint32_t i = 0; i < keyArray.Length(); i++) {
-        Napi::Maybe<Napi::Value> maybeKeyValue = keyArray.Get(i);
-        if (maybeKeyValue.IsNothing() || !maybeKeyValue.Unwrap().IsNumber()) {
-            Napi::Error::New(env, "Key code must be a number").ThrowAsJavaScriptException();
-        }
-        keyCodes.push_back(maybeKeyValue.Unwrap().As<Napi::Number>().Uint32Value());
-    }
-
-    HWND hwnd;
-    if (!windowTitle.empty()) {
-        hwnd = FindWindowA(nullptr, windowTitle.c_str());
-        if (!hwnd) {
-            return Napi::Boolean::New(env, false);
-        }
-    } else {
-        hwnd = GetForegroundWindow();
-    }
-
-    SendText(hwnd, keyCodes, delay);
-
-    return Napi::Boolean::New(env, true);
-}
-
-Napi::Value TapKey(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-
-    if (info.Length() < 1 || !info[0].IsNumber()) {
-        Napi::Error::New(env, "Expected keyCode as first argument").ThrowAsJavaScriptException();
-    }
-
-    WORD keyCode = info[0].As<Napi::Number>().Uint32Value();
-    std::string windowTitle = "";
-    
-    if (info.Length() > 1 && info[1].IsString()) {
-        windowTitle = info[1].As<Napi::String>().Utf8Value();
-        
-        // Add window existence check
-        HWND hwnd = FindWindowA(nullptr, windowTitle.c_str());
-        if (!hwnd) {
-            Napi::Error::New(env, "Window not found").ThrowAsJavaScriptException();
-            return env.Null();
-        }
-    }
-
-    tapKey(keyCode, windowTitle);
     return env.Null();
 }
 

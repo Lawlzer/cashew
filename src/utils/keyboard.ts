@@ -138,23 +138,28 @@ function keyToKeyCode(key: Key) {
 
 export class Keyboard {
 	/**
-	 * WARNING: Seems to be relatively inconsistent in background windows.
+	 * Holds a key using the SendInput API with scan codes, which may work better with games
+	 * and other applications where standard input methods are inconsistent.
 	 */
 	public static async holdKey(inputKey: Key, windowTitle?: string): Promise<void> {
 		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
-		await keyboardAddon.holdKey(keyToKeyCode(inputKey), windowTitleFinal);
+		// Uses SendInput with a different approach than the standard holdKey
+		const keyCode = keyToKeyCode(inputKey);
+		await keyboardAddon.holdKey(keyCode, windowTitleFinal);
 	}
 
 	/**
-	 * WARNING: Requires it to be the Foreground window. Does not seem to be possible to release keys in background windows.
+	 * Releases a key using the SendInput API with scan codes.
+	 * WARNING: Often requires the target window to be in the foreground.
 	 */
-	public static async releaseKeyDesktop(inputKey: Key, windowTitle?: string): Promise<void> {
+	public static async releaseKey(inputKey: Key, windowTitle?: string): Promise<void> {
 		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
-		await keyboardAddon.releaseKey(keyToKeyCode(inputKey), windowTitleFinal);
+		const keyCode = keyToKeyCode(inputKey);
+		await keyboardAddon.releaseKey(keyCode, windowTitleFinal);
 	}
 
 	/**
-	 * May be useful, because holdKey + releaseKey internally works differently than Type, so it *may* be useful.
+	 * Taps a key (press and release).
 	 */
 	public static async tapKey(inputKey: Key, windowTitle?: string): Promise<void> {
 		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
@@ -162,12 +167,13 @@ export class Keyboard {
 	}
 
 	/**
-	 * WARNING: Does not seem to work in background windows?
+	 * Holds a key for a specified duration using the scan code method.
 	 */
-	public static async holdKeyFor(inputKey: Key, holdFor: number): Promise<void> {
-		await this.holdKey(inputKey);
+	public static async holdKeyFor(inputKey: Key, holdFor: number, windowTitle?: string): Promise<void> {
+		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
+		await this.holdKey(inputKey, windowTitleFinal);
 		await sleep(holdFor);
-		await this.releaseKeyDesktop(inputKey);
+		await this.releaseKey(inputKey, windowTitleFinal);
 	}
 
 	public static async isKeyPressed(key: Key): Promise<boolean> {
