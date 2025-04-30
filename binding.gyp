@@ -2,7 +2,7 @@
    'targets': [
        {
            'target_name': 'clipboard',
-           'sources': [ 'src/cpp/clipboard/addon.cpp' ],
+           'sources': [ 'src/cpp/clipboard.cpp' ],
            'include_dirs': [
                '<!(node -p "require(\'node-addon-api\').include_dir")'
            ],
@@ -19,7 +19,7 @@
        },
        {
            'target_name': 'screen',
-           'sources': [ 'src/cpp/screen/addon.cpp' ],
+           'sources': [ 'src/cpp/screen.cpp' ],
            'include_dirs': [
                '<!(node -p "require(\'node-addon-api\').include_dir")'
            ],
@@ -36,7 +36,7 @@
        },
        {
            'target_name': 'keyboard',
-           'sources': [ 'src/cpp/keyboard/addon.cpp' ],
+           'sources': [ 'src/cpp/keyboard.cpp' ],
            'include_dirs': [
                '<!(node -p "require(\'node-addon-api\').include_dir")'
            ],
@@ -53,7 +53,7 @@
        },
        {
            'target_name': 'mouse',
-           'sources': [ 'src/cpp/mouse/addon.cpp' ],
+           'sources': [ 'src/cpp/mouse.cpp' ],
            'include_dirs': [
                '<!(node -p "require(\'node-addon-api\').include_dir")'
            ],
@@ -70,7 +70,7 @@
        },
 	    {
            'target_name': 'misc',
-           'sources': [ 'src/cpp/misc/addon.cpp' ],
+           'sources': [ 'src/cpp/misc.cpp' ],
            'include_dirs': [
                '<!(node -p "require(\'node-addon-api\').include_dir")'
            ],
@@ -87,7 +87,7 @@
        },
        {
            'target_name': 'screenRaw',
-           'sources': [ 'src/cpp/screenRaw/addon.cpp' ],
+           'sources': [ 'src/cpp/screenRaw.cpp' ],
            'include_dirs': [
                '<!(node -p "require(\'node-addon-api\').include_dir")'
            ],
