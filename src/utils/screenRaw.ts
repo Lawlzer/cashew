@@ -1,9 +1,47 @@
 import { throwError } from '@lawlzer/utils';
-import { loadBinding } from './bindingLoader';
+import { loadTypedBinding, type BindingSchema, createValidatedFunction } from './bindingLoader';
 import type { Position } from './misc';
 import type { rgb } from './screen';
 
-const screenRawBinding = loadBinding('screenRaw');
+interface ScreenRawBinding {
+	setSquare: (x: number, y: number, width: number, height: number, r: number, g: number, b: number) => Promise<boolean>;
+	clearSquare: () => Promise<boolean>;
+}
+
+// Define the schema for the screenRaw binding
+const screenRawBindingSchema: BindingSchema = {
+	setSquare: {
+		type: 'function',
+		params: [
+			{ name: 'x', type: 'number' },
+			{ name: 'y', type: 'number' },
+			{ name: 'width', type: 'number' },
+			{ name: 'height', type: 'number' },
+			{ name: 'r', type: 'number' },
+			{ name: 'g', type: 'number' },
+			{ name: 'b', type: 'number' },
+		],
+		returnType: 'boolean',
+	},
+	clearSquare: {
+		type: 'function',
+		params: [],
+		returnType: 'boolean',
+	},
+};
+
+// Custom validator for ScreenRawBinding
+function isScreenRawBinding(binding: unknown): binding is ScreenRawBinding {
+	return typeof binding === 'object' && binding !== null && 'setSquare' in binding && 'clearSquare' in binding && typeof (binding as any).setSquare === 'function' && typeof (binding as any).clearSquare === 'function';
+}
+
+// Load the binding with proper typing and validation
+const screenRawBinding = loadTypedBinding<ScreenRawBinding>('screenRaw', screenRawBindingSchema, isScreenRawBinding);
+
+// Create validated wrapper functions with runtime type checking
+const setSquareValidated = createValidatedFunction(screenRawBinding.setSquare, 'setSquare', 'boolean');
+
+const clearSquareValidated = createValidatedFunction(screenRawBinding.clearSquare, 'clearSquare', 'boolean');
 
 export class ScreenRaw {
 	/**
@@ -30,9 +68,9 @@ export class ScreenRaw {
 			throwError('RGB values must be between 0 and 255');
 		}
 
-		const result = await screenRawBinding.setSquare(position.x, position.y, size.width, size.height, color.r, color.g, color.b);
+		const result = await setSquareValidated(position.x, position.y, size.width, size.height, color.r, color.g, color.b);
 
-		if (result !== true) throwError(`Invalid result: ${result}`);
+		if (!result) throwError(`Invalid result: ${result}`);
 		return true;
 	}
 
@@ -41,9 +79,9 @@ export class ScreenRaw {
 	 * @returns Promise resolving to true if successful
 	 */
 	public static async clearSquare(): Promise<boolean> {
-		const result = await screenRawBinding.clearSquare();
+		const result = await clearSquareValidated();
 
-		if (result !== true) throwError(`Invalid result: ${result}`);
+		if (!result) throwError(`Invalid result: ${result}`);
 		return true;
 	}
 }

@@ -1,8 +1,76 @@
 import { sleep, throwError } from '@lawlzer/utils';
-import { loadBinding } from './bindingLoader';
+import { loadTypedBinding, type BindingSchema, createValidatedFunction } from './bindingLoader';
 
 import { Config } from './config';
-const keyboardAddon = loadBinding('keyboard');
+
+interface KeyboardBinding {
+	holdKey: (keyCode: number, windowTitle: string) => Promise<void>;
+	releaseKey: (keyCode: number, windowTitle: string) => Promise<void>;
+	tapKey: (keyCode: number, windowTitle: string) => Promise<void>;
+	isKeyPressed: (keyCode: number) => Promise<boolean>;
+	type: (keycodesArray: number[], windowTitle: string, delayPerKey: number) => Promise<boolean>;
+}
+
+// Define the schema for the keyboard binding
+const keyboardBindingSchema: BindingSchema = {
+	holdKey: {
+		type: 'function',
+		params: [
+			{ name: 'keyCode', type: 'number' },
+			{ name: 'windowTitle', type: 'string' },
+		],
+		returnType: 'undefined',
+	},
+	releaseKey: {
+		type: 'function',
+		params: [
+			{ name: 'keyCode', type: 'number' },
+			{ name: 'windowTitle', type: 'string' },
+		],
+		returnType: 'undefined',
+	},
+	tapKey: {
+		type: 'function',
+		params: [
+			{ name: 'keyCode', type: 'number' },
+			{ name: 'windowTitle', type: 'string' },
+		],
+		returnType: 'undefined',
+	},
+	isKeyPressed: {
+		type: 'function',
+		params: [{ name: 'keyCode', type: 'number' }],
+		returnType: 'boolean',
+	},
+	type: {
+		type: 'function',
+		params: [
+			{ name: 'keycodesArray', type: 'object' },
+			{ name: 'windowTitle', type: 'string' },
+			{ name: 'delayPerKey', type: 'number' },
+		],
+		returnType: 'boolean',
+	},
+};
+
+// Custom validator for KeyboardBinding
+function isKeyboardBinding(binding: unknown): binding is KeyboardBinding {
+	return typeof binding === 'object' && binding !== null && 'holdKey' in binding && 'releaseKey' in binding && 'tapKey' in binding && 'isKeyPressed' in binding && 'type' in binding && typeof (binding as any).holdKey === 'function' && typeof (binding as any).releaseKey === 'function' && typeof (binding as any).tapKey === 'function' && typeof (binding as any).isKeyPressed === 'function' && typeof (binding as any).type === 'function';
+}
+
+// Load the binding with proper typing and validation
+const keyboardBinding = loadTypedBinding<KeyboardBinding>('keyboard', keyboardBindingSchema, isKeyboardBinding);
+
+// Create validated wrapper functions with runtime type checking
+const holdKeyValidated = createValidatedFunction(keyboardBinding.holdKey, 'holdKey', 'undefined');
+
+const releaseKeyValidated = createValidatedFunction(keyboardBinding.releaseKey, 'releaseKey', 'undefined');
+
+const tapKeyValidated = createValidatedFunction(keyboardBinding.tapKey, 'tapKey', 'undefined');
+
+const isKeyPressedValidated = createValidatedFunction(keyboardBinding.isKeyPressed, 'isKeyPressed', 'boolean');
+
+const typeValidated = createValidatedFunction(keyboardBinding.type, 'type', 'boolean');
 
 const keyAddonMap = {
 	// backspace: 8, // untested
@@ -145,7 +213,7 @@ export class Keyboard {
 		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
 		// Uses SendInput with a different approach than the standard holdKey
 		const keyCode = keyToKeyCode(inputKey);
-		await keyboardAddon.holdKey(keyCode, windowTitleFinal);
+		await holdKeyValidated(keyCode, windowTitleFinal);
 	}
 
 	/**
@@ -155,7 +223,7 @@ export class Keyboard {
 	public static async releaseKey(inputKey: Key, windowTitle?: string): Promise<void> {
 		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
 		const keyCode = keyToKeyCode(inputKey);
-		await keyboardAddon.releaseKey(keyCode, windowTitleFinal);
+		await releaseKeyValidated(keyCode, windowTitleFinal);
 	}
 
 	/**
@@ -163,7 +231,8 @@ export class Keyboard {
 	 */
 	public static async tapKey(inputKey: Key, windowTitle?: string): Promise<void> {
 		const windowTitleFinal = windowTitle ?? Config.getProcessConfig().windowTitle ?? '';
-		await keyboardAddon.tapKey(keyToKeyCode(inputKey), windowTitleFinal);
+		const keyCode = keyToKeyCode(inputKey);
+		await tapKeyValidated(keyCode, windowTitleFinal);
 	}
 
 	/**
@@ -177,7 +246,7 @@ export class Keyboard {
 	}
 
 	public static async isKeyPressed(key: Key): Promise<boolean> {
-		const result = await keyboardAddon.isKeyPressed(keyToKeyCode(key));
+		const result = await isKeyPressedValidated(keyToKeyCode(key));
 		if (typeof result !== 'boolean') throwError('result was not a boolean: ', result);
 		return result;
 	}
@@ -196,7 +265,7 @@ export class Keyboard {
 
 		const keycodesArray = text.split('').map((char) => keyToKeyCode(char as Key));
 
-		await keyboardAddon.type(keycodesArray, windowTitle, options?.delayPerKey ?? 1);
+		await typeValidated(keycodesArray, windowTitle, options?.delayPerKey ?? 1);
 	}
 }
 

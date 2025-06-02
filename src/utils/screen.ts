@@ -1,12 +1,53 @@
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
 import { ensureDirectoryExists, throwError } from '@lawlzer/utils';
-import { loadBinding } from './bindingLoader';
+import { loadTypedBinding, type BindingSchema, createValidatedFunction } from './bindingLoader';
 import sharp from 'sharp';
 
 import { Config } from './config';
 import { isCorrectColour, type Position } from './misc';
 
-const screenAddon = loadBinding('screen');
+interface ScreenBinding {
+	getWindowPixels: (windowTitle: string, x: number, y: number, width: number, height: number) => Promise<Buffer>;
+	getScreenPixels: (x: number, y: number, width: number, height: number) => Promise<Buffer>;
+}
+
+// Define the schema for the screen binding
+const screenBindingSchema: BindingSchema = {
+	getWindowPixels: {
+		type: 'function',
+		params: [
+			{ name: 'windowTitle', type: 'string' },
+			{ name: 'x', type: 'number' },
+			{ name: 'y', type: 'number' },
+			{ name: 'width', type: 'number' },
+			{ name: 'height', type: 'number' },
+		],
+		returnType: 'object', // Buffer
+	},
+	getScreenPixels: {
+		type: 'function',
+		params: [
+			{ name: 'x', type: 'number' },
+			{ name: 'y', type: 'number' },
+			{ name: 'width', type: 'number' },
+			{ name: 'height', type: 'number' },
+		],
+		returnType: 'object', // Buffer
+	},
+};
+
+// Custom validator for ScreenBinding
+function isScreenBinding(binding: unknown): binding is ScreenBinding {
+	return typeof binding === 'object' && binding !== null && 'getWindowPixels' in binding && 'getScreenPixels' in binding && typeof (binding as any).getWindowPixels === 'function' && typeof (binding as any).getScreenPixels === 'function';
+}
+
+// Load the binding with proper typing and validation
+const screenBinding = loadTypedBinding<ScreenBinding>('screen', screenBindingSchema, isScreenBinding);
+
+// Create validated wrapper functions with runtime type checking
+const getWindowPixelsValidated = createValidatedFunction(screenBinding.getWindowPixels, 'getWindowPixels', 'object', (value): value is Buffer => Buffer.isBuffer(value));
+
+const getScreenPixelsValidated = createValidatedFunction(screenBinding.getScreenPixels, 'getScreenPixels', 'object', (value): value is Buffer => Buffer.isBuffer(value));
 
 export interface rgb {
 	r: number;
@@ -150,12 +191,12 @@ export class Screen {
 		const realWindowTitle = windowTitle ?? Config.getProcessConfig().windowTitle;
 
 		if (realWindowTitle !== '' && realWindowTitle !== undefined) {
-			const result: Buffer = await screenAddon.getWindowPixels(realWindowTitle, x, y, width, height);
+			const result: Buffer = await getWindowPixelsValidated(realWindowTitle, x, y, width, height);
 			if (!Buffer.isBuffer(result)) throwError('Result is not a buffer');
 			return result;
 		}
 
-		const result: Buffer = await screenAddon.getScreenPixels(x, y, width, height);
+		const result: Buffer = await getScreenPixelsValidated(x, y, width, height);
 		if (!Buffer.isBuffer(result)) throwError('Result is not a buffer -- this is certainly an issue with @lawlzer/cashew');
 		return result;
 	}
