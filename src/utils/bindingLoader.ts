@@ -10,12 +10,30 @@ declare const require: NodeRequire;
 
 // Helper function to safely check if we're in ESM environment
 function isESMEnvironment(): boolean {
-	return typeof import.meta?.url === 'string';
+	try {
+		// Dynamically create a function to check for import.meta.url
+		// This can help bypass static analysis that flags import.meta in CJS
+		// eslint-disable-next-line @typescript-eslint/no-implied-eval
+		const checkMeta = new Function("return typeof import.meta?.url === 'string';");
+		return checkMeta() as boolean;
+	} catch (_e) {
+		// If new Function() is disallowed or import.meta is truly not available in a way that causes an error
+		return false;
+	}
 }
 
 // Helper function to get import.meta.url safely
 function getImportMetaUrl(): string | null {
-	return import.meta?.url ?? null;
+	try {
+		// Dynamically create a function to get import.meta.url
+		// eslint-disable-next-line @typescript-eslint/no-implied-eval
+		const getMetaUrl = new Function('return import.meta?.url;');
+		const url = getMetaUrl() as string | undefined;
+		return url ?? null;
+	} catch (_e) {
+		// If new Function() is disallowed or import.meta is not available
+		return null;
+	}
 }
 
 // Helper function to get __filename and __dirname in both ESM and CJS

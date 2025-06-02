@@ -140,11 +140,11 @@ export async function initToggleMonitor({
 	let isActive = initialState;
 
 	if (isActive && typeof onMessage === 'string') {
-		console.log(`Initializing toggle monitor for key "${key}". Initial state: ${onMessage}`);
+		console.info(`Initializing toggle monitor for key "${key}". Initial state: ${onMessage}`);
 	} else if (!isActive && typeof offMessage === 'string') {
-		console.log(`Initializing toggle monitor for key "${key}". Initial state: ${offMessage}`);
+		console.info(`Initializing toggle monitor for key "${key}". Initial state: ${offMessage}`);
 	} else {
-		console.log(`Initializing toggle monitor for key "${key}". Initial state: ${isActive ? 'ON' : 'OFF'}. (Custom messages disabled)`);
+		console.info(`Initializing toggle monitor for key "${key}". Initial state: ${isActive ? 'ON' : 'OFF'}. (Custom messages disabled)`);
 	}
 
 	// Attempt to get initial key state.
@@ -167,9 +167,9 @@ export async function initToggleMonitor({
 					isActive = !isActive;
 					func(isActive); // Call the user's callback function
 					if (isActive && typeof onMessage === 'string') {
-						console.log(onMessage);
+						console.info(onMessage);
 					} else if (!isActive && typeof offMessage === 'string') {
-						console.log(offMessage);
+						console.info(offMessage);
 					}
 				}
 				keyPressStates.set(key, currentKeyState); // Update the stored state for this key
@@ -184,28 +184,4 @@ export async function initToggleMonitor({
 		// This catches an error if the async IIFE itself fails catastrophically
 		console.error(`Unhandled critical error in monitor loop for key "${key}". The monitor for this key will stop.`, unhandledError);
 	});
-}
-
-// Convenience function to create a toggle monitor with common defaults.
-// Provides sensible defaults for onMessage, offMessage, initialState, and pollingInterval.
-export async function createToggleMonitor(
-	key: Key,
-	callback: (isOn: boolean) => void,
-	options: {
-		onMessage?: string | false | null;
-		offMessage?: string | false | null;
-		initialState?: boolean; // Default handled by initToggleMonitor
-		pollingInterval?: number; // Default handled by initToggleMonitor
-	} = {}
-): Promise<void> {
-	const params: InitToggleMonitorParams = {
-		key,
-		func: callback,
-		onMessage: options.onMessage === undefined ? `${key} toggled ON` : options.onMessage,
-		offMessage: options.offMessage === undefined ? `${key} toggled OFF` : options.offMessage,
-		initialState: options.initialState,
-		pollingInterval: options.pollingInterval,
-	};
-
-	return initToggleMonitor(params);
 }

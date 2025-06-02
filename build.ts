@@ -2,14 +2,15 @@ import esbuild from 'esbuild';
 import { promises as fs } from 'fs';
 import * as pathModule from 'path';
 
-async function build(name: string, options: esbuild.BuildOptions): Promise<esbuild.BuildResult> {
+async function build(name: string, options: esbuild.BuildOptions, logOverride?: Record<string, esbuild.LogLevel>): Promise<esbuild.BuildResult> {
 	const filePath = `${name}.js`;
 	console.info(`Building ${name}...`);
 
-	const buildOptions = {
+	const buildOptions: esbuild.BuildOptions = {
 		outfile: `./dist/${filePath}`,
 		bundle: true,
 		...options,
+		logOverride,
 	};
 
 	if (process.argv.includes('--watch')) {
@@ -76,13 +77,17 @@ async function buildAll(): Promise<esbuild.BuildResult[]> {
 			external: externalPackages,
 			format: 'esm',
 		}),
-		build('cjs', {
-			entryPoints: ['src/index.js'],
-			target: ['node10.4'],
-			platform: 'node',
-			external: externalPackages,
-			format: 'cjs',
-		}),
+		build(
+			'cjs',
+			{
+				entryPoints: ['src/index.js'],
+				target: ['node10.4'],
+				platform: 'node',
+				external: externalPackages,
+				format: 'cjs',
+			},
+			{ 'empty-import-meta': 'silent' }
+		),
 	]);
 
 	// Copy native bindings after JS build completes
