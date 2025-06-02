@@ -1,9 +1,27 @@
-import { sleep, throwError } from '@lawlzer/utils';
-import bindings from 'bindings';
-const mouseAddon = bindings('mouse');
+import { throwError } from '@lawlzer/utils';
+import { loadBinding } from './bindingLoader';
+
+interface MouseAddon {
+	clickMessage: (x: number, y: number, holdFor: number, windowTitle: string, type: 'post' | 'send') => Promise<void>;
+	click: (x: number | null, y: number | null, button: string, holdFor: number, windowTitle: string) => Promise<void>;
+	getPosition: () => Promise<{ x: number; y: number }>;
+	hold: (x: number | null, y: number | null, button: string) => Promise<void>;
+	release: (x: number | null, y: number | null, button: string) => Promise<void>;
+}
+
+function isMouseAddon(addon: unknown): addon is MouseAddon {
+	if (!addon || typeof addon !== 'object') return false;
+	const mouseAddon = addon as any;
+	return typeof mouseAddon.clickMessage === 'function' && typeof mouseAddon.click === 'function' && typeof mouseAddon.getPosition === 'function' && typeof mouseAddon.hold === 'function' && typeof mouseAddon.release === 'function';
+}
+
+const rawMouseAddon = loadBinding('mouse');
+if (!isMouseAddon(rawMouseAddon)) {
+	throwError('Mouse addon does not have the expected functions. Expected: clickMessage, click, getPosition, hold, release');
+}
+const mouseAddon = rawMouseAddon;
 
 import type { Position } from './misc';
-import { Config } from './config';
 
 function isPosition(pos: any): pos is Position {
 	return typeof pos === 'object' && typeof pos.x === 'number' && typeof pos.y === 'number';
@@ -17,7 +35,7 @@ export class Mouse {
 	 */
 
 	// public static async click(options: { button?: 'left' | 'right'; position: Position; clickCount?: number; holdFor?: number; delayAfter?: number }): Promise<void> {
-	// 	throwError('Mouse.click is disabled --- Windows does not allow you to click on background applications, without bringing them to the foreground first.');
+	// 	throwError('Mouse.click is disabled --- Windows do not seem to allow you to click on background applications, without bringing them to the foreground first.');
 	// }
 
 	/**

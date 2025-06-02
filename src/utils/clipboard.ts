@@ -1,6 +1,7 @@
 import { throwError } from '@lawlzer/utils';
-import bindings from 'bindings';
-const clipboardBinding = bindings('clipboard') ?? throwError('Could not load clipboard binding');
+import { loadBinding } from './bindingLoader';
+
+const clipboardBinding = loadBinding('clipboard');
 
 export class Clipboard {
 	public static async write(text: string): Promise<void> {

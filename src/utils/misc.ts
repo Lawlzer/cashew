@@ -1,10 +1,10 @@
 import { throwError } from '@lawlzer/utils';
-import bindings from 'bindings';
+import { loadBinding } from './bindingLoader';
 import { Keyboard } from './keyboard';
 import type { Key } from './keyboard';
-import type { Area, rgb, Screen } from './screen';
+import type { Area, rgb } from './screen';
 
-const miscBinding = bindings('misc') ?? throwError('Could not load misc binding');
+const miscBinding = loadBinding('misc');
 
 export async function setForegroundWindow(windowTitle: string) {
 	await miscBinding.SetForegroundWindow(windowTitle);

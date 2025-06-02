@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
 import { ensureDirectoryExists, throwError } from '@lawlzer/utils';
-import bindings from 'bindings';
+import { loadBinding } from './bindingLoader';
 import sharp from 'sharp';
 
 import { Config } from './config';
 import { isCorrectColour, type Position } from './misc';
 
-const screenAddon = bindings('screen');
+const screenAddon = loadBinding('screen');
 
 export interface rgb {
 	r: number;
@@ -40,7 +40,6 @@ export class Image {
 		this.height = height;
 	}
 
-	// eslint-disable-next-line @typescript-eslint/require-await
 	public async getPixel(x: number, y: number): Promise<rgb> {
 		if (x >= this.width || y >= this.height) throwError('Pixel coordinates out of bounds');
 
@@ -92,7 +91,6 @@ export class Image {
 		return new Image(buffer, width, height);
 	}
 
-	// eslint-disable-next-line @typescript-eslint/require-await
 	public async setPixelColour(x: number, y: number, colour: rgb): Promise<void> {
 		if (x >= this.width || y >= this.height) throwError('Pixel coordinates out of bounds');
 

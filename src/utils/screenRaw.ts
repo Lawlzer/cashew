@@ -1,9 +1,9 @@
 import { throwError } from '@lawlzer/utils';
-import bindings from 'bindings';
+import { loadBinding } from './bindingLoader';
 import type { Position } from './misc';
 import type { rgb } from './screen';
 
-const screenRawBinding = bindings('screenRaw') ?? throwError('Could not load screenRaw binding');
+const screenRawBinding = loadBinding('screenRaw');
 
 export class ScreenRaw {
 	/**

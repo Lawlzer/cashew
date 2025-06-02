@@ -1,8 +1,8 @@
 import { sleep, throwError } from '@lawlzer/utils';
-import bindings from 'bindings';
+import { loadBinding } from './bindingLoader';
 
 import { Config } from './config';
-const keyboardAddon = bindings('keyboard');
+const keyboardAddon = loadBinding('keyboard');
 
 const keyAddonMap = {
 	// backspace: 8, // untested

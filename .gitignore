@@ -5,29 +5,35 @@ node_modules
 logs
 routeTypes
 
-# Package stuff
-bun.lockb
-package-*.json
-
 # Temporary caches
 *.tsbuildinfo
 caches
 cache
 lerna-debug.log
 zig-cache
+Cargo.lock
+bun.lockb
 
 # Environment variables/secrets
 .env
 .env.development
 .env.production
 .env.test
+.envrc
 
 # Build / Generated output
 build
 dist
-lib
+out
 output
+lib
 zig-out
+
+serverOutput
+coverage
+
+data
+.next
 
 # Temporary/dev locations
 legacy
@@ -38,9 +44,22 @@ debug
 todo
 todo.txt
 
-serverOutput
+backup
+
 volume
 volumes
 
-# Specific to this project
-saves
+
+# Python specific
+__pycache__
+.venv
+
+# Model caches
+model_cache/
+**/model_cache/**
+whisper-openai-exp/
+feature_cache
+
+# Questionable
+package-lock.json
+bun.lock
