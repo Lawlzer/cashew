@@ -140,11 +140,11 @@ export async function initToggleMonitor({
 	let isActive = initialState;
 
 	if (isActive && typeof onMessage === 'string') {
-		console.log(`Initializing toggle monitor for key "${key}". Initial state: ${onMessage}`);
+		console.info(`Initializing toggle monitor for key "${key}". Initial state: ${onMessage}`);
 	} else if (!isActive && typeof offMessage === 'string') {
-		console.log(`Initializing toggle monitor for key "${key}". Initial state: ${offMessage}`);
+		console.info(`Initializing toggle monitor for key "${key}". Initial state: ${offMessage}`);
 	} else {
-		console.log(`Initializing toggle monitor for key "${key}". Initial state: ${isActive ? 'ON' : 'OFF'}. (Custom messages disabled)`);
+		console.info(`Initializing toggle monitor for key "${key}". Initial state: ${isActive ? 'ON' : 'OFF'}. (Custom messages disabled)`);
 	}
 
 	// Attempt to get initial key state.
@@ -167,9 +167,9 @@ export async function initToggleMonitor({
 					isActive = !isActive;
 					func(isActive); // Call the user's callback function
 					if (isActive && typeof onMessage === 'string') {
-						console.log(onMessage);
+						console.info(onMessage);
 					} else if (!isActive && typeof offMessage === 'string') {
-						console.log(offMessage);
+						console.info(offMessage);
 					}
 				}
 				keyPressStates.set(key, currentKeyState); // Update the stored state for this key
