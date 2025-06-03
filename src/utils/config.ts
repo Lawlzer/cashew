@@ -1,15 +1,22 @@
-interface ProcessConfig {
+export interface ProcessConfig {
 	windowTitle?: string;
 }
 
-export class Config {
-	private static processConfig: ProcessConfig = {};
+// Singleton configuration with better encapsulation
+class ConfigManager {
+	private config: ProcessConfig = {};
 
-	public static setProcessConfig(newConfig: ProcessConfig): void {
-		Config.processConfig = { ...Config.processConfig, ...newConfig };
+	public get windowTitle(): string | undefined {
+		return this.config.windowTitle;
 	}
 
-	public static getProcessConfig(): ProcessConfig {
-		return Config.processConfig;
+	public update(newConfig: Partial<ProcessConfig>): void {
+		this.config = { ...this.config, ...newConfig };
+	}
+
+	public get(): Readonly<ProcessConfig> {
+		return this.config;
 	}
 }
+
+export const Config = new ConfigManager();

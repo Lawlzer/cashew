@@ -14,6 +14,10 @@
 #include <algorithm> // For std::transform
 #include <stdint.h>  // For uint32_t
 
+#include "common.h"
+
+using namespace cashew;
+
 HWND FindWindowByTitle(const std::string& title) {
     HWND hwnd = FindWindowA(NULL, title.c_str());
     if (hwnd == NULL) {
@@ -22,75 +26,108 @@ HWND FindWindowByTitle(const std::string& title) {
     return hwnd;
 }
 
-Napi::Buffer<uint32_t> getWindowPixels(const Napi::CallbackInfo& info, const std::string& windowTitle, int x, int y, int width, int height) {
+// Helper function to capture pixels from a specific area
+Napi::Buffer<uint32_t> CapturePixels(const Napi::CallbackInfo& info, HWND hwnd, 
+                                     int x, int y, int width, int height, 
+                                     bool useWindowCapture) {
     Napi::Env env = info.Env();
     
-    HWND hwnd = FindWindowByTitle(windowTitle);
-    if (hwnd == NULL) {
-        Napi::Error::New(env, "Window not found").ThrowAsJavaScriptException();
+    DcHandle hDc(hwnd);
+    if (!hDc.get()) {
+        ThrowWindowsError(env, "Failed to get device context");
+        return Napi::Buffer<uint32_t>::New(env, 0);
     }
     
-    HDC const hDc = GetDC(hwnd);
-    HDC const hDcmem = CreateCompatibleDC(hDc);
-    HBITMAP const hBmp = CreateCompatibleBitmap(hDc, x + width, y + height);
-    SelectObject(hDcmem, hBmp);
-    
-    // We have to use PrintWindow here, because BitBlt doesn't work for background windows
-    if (!PrintWindow(hwnd, hDcmem, PW_RENDERFULLCONTENT)) {
-        Napi::Error::New(env, "PrintWindow failed").ThrowAsJavaScriptException();
+    CompatibleDcHandle hDcMem(hDc);
+    if (!hDcMem.get()) {
+        ThrowWindowsError(env, "Failed to create compatible DC");
+        return Napi::Buffer<uint32_t>::New(env, 0);
     }
     
+    // Create bitmap with appropriate size
+    int bmpWidth = useWindowCapture ? (x + width) : width;
+    int bmpHeight = useWindowCapture ? (y + height) : height;
+    BitmapHandle hBmp(hDc, bmpWidth, bmpHeight);
+    if (!hBmp.get()) {
+        ThrowWindowsError(env, "Failed to create bitmap");
+        return Napi::Buffer<uint32_t>::New(env, 0);
+    }
+    
+    SelectObject(hDcMem, hBmp);
+    
+    // Capture the screen/window content
+    if (useWindowCapture) {
+        // Use PrintWindow for background windows
+        if (!PrintWindow(hwnd, hDcMem, PW_RENDERFULLCONTENT)) {
+            ThrowWindowsError(env, "PrintWindow failed");
+            return Napi::Buffer<uint32_t>::New(env, 0);
+        }
+    } else {
+        // Use BitBlt for screen capture
+        if (!BitBlt(hDcMem, 0, 0, width, height, hDc, x, y, SRCCOPY)) {
+            ThrowWindowsError(env, "BitBlt failed");
+            return Napi::Buffer<uint32_t>::New(env, 0);
+        }
+    }
+    
+    // Setup bitmap info
     BITMAPINFO bmi{};
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = x + width;
-    bmi.bmiHeader.biHeight = -(y + height); // fuck you fuck you fuck you
+    bmi.bmiHeader.biWidth = bmpWidth;
+    bmi.bmiHeader.biHeight = -bmpHeight; // Top-down bitmap
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
 
-    // Create a buffer to hold the entire captured image
-    std::vector<uint32_t> fullImageData((x + width) * (y + height));
-    if (!GetDIBits(hDcmem, hBmp, 0, y + height, fullImageData.data(), &bmi, DIB_RGB_COLORS)) {
-        Napi::Error::New(env, "GetDIBits failed");
-    }
-
-    // Create a buffer to hold the requested portion of the image
+    // Create buffer for the result
     Napi::Buffer<uint32_t> buffer = Napi::Buffer<uint32_t>::New(env, width * height);
     uint32_t* imageData = buffer.Data();
 
-    // Copy the relevant portion of the image data, taking stride into account
-	// This wouldn't be necessary, if we just used BitBlt -- but that doesn't work for background windows.
-    int fullStride = x + width;
-    for (int row = 0; row < height; ++row) {
-        for (int col = 0; col < width; ++col) {
-            int srcIndex = (row + y) * fullStride + (col + x);
-            int destIndex = row * width + col;
-            imageData[destIndex] = fullImageData[srcIndex];
+    if (useWindowCapture) {
+        // For window capture, we need to extract the relevant portion
+        std::vector<uint32_t> fullImageData(bmpWidth * bmpHeight);
+        if (!GetDIBits(hDcMem, hBmp, 0, bmpHeight, fullImageData.data(), &bmi, DIB_RGB_COLORS)) {
+            ThrowWindowsError(env, "GetDIBits failed");
+            return Napi::Buffer<uint32_t>::New(env, 0);
+        }
+
+        // Copy the relevant portion
+        for (int row = 0; row < height; ++row) {
+            for (int col = 0; col < width; ++col) {
+                int srcIndex = (row + y) * bmpWidth + (col + x);
+                int destIndex = row * width + col;
+                imageData[destIndex] = fullImageData[srcIndex];
+            }
+        }
+    } else {
+        // For screen capture, get the data directly
+        if (!GetDIBits(hDcMem, hBmp, 0, height, imageData, &bmi, DIB_RGB_COLORS)) {
+            ThrowWindowsError(env, "GetDIBits failed");
+            return Napi::Buffer<uint32_t>::New(env, 0);
         }
     }
 
-    // We are given BGRA format, so we must swap it ourselves
-    for (int i = 0; i < width * height; i++) {
-        uint32_t pixel = imageData[i];
-        uint32_t r = (pixel & 0x00FF0000) >> 16;
-        uint32_t b = (pixel & 0x000000FF) << 16;
-        imageData[i] = (pixel & 0xFF00FF00) | r | b;
-    }
-
-    DeleteObject(hBmp);
-    DeleteDC(hDcmem);
-    ReleaseDC(hwnd, hDc);
+    // Convert BGRA to RGBA
+    ConvertBGRAtoRGBA(imageData, width * height);
 
     return buffer;
 }
 
-Napi::Value GetWindowPixelsMain(const Napi::CallbackInfo& info) {
-    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
+Napi::Value GetWindowPixels(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
 
-    // Expecting 5 parameters: windowTitle, x, y, width, height
+    // Validate arguments
     if (info.Length() != 5) {
-        Napi::Error::New(env, "Expected 5 arguments").ThrowAsJavaScriptException();
+        Napi::Error::New(env, "Expected 5 arguments: windowTitle, x, y, width, height")
+            .ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    if (!info[0].IsString() || !info[1].IsNumber() || !info[2].IsNumber() || 
+        !info[3].IsNumber() || !info[4].IsNumber()) {
+        Napi::Error::New(env, "Invalid argument types. Expected: string, number, number, number, number")
+            .ThrowAsJavaScriptException();
+        return env.Null();
     }
 
     std::string windowTitle = info[0].As<Napi::String>().Utf8Value();
@@ -99,65 +136,27 @@ Napi::Value GetWindowPixelsMain(const Napi::CallbackInfo& info) {
     int width = info[3].As<Napi::Number>().Int32Value();
     int height = info[4].As<Napi::Number>().Int32Value();
     
-    auto colors = getWindowPixels(info, windowTitle, x, y, width, height);
-
-    return colors;
+    HWND hwnd = FindWindowSafe(env, windowTitle);
+    if (!hwnd) return env.Null();
+    
+    return CapturePixels(info, hwnd, x, y, width, height, true);
 }
 
-
-Napi::Buffer<uint32_t> getScreenPixels(const Napi::CallbackInfo& info, int x, int y, int width, int height) {
-    Napi::Env env = info.Env();
-    
-    HWND hwnd = GetDesktopWindow(); // todo questionmark this hsouldn't be the issue but maybe?
-	// https://github.com/Lawlzer/macros/blob/f8205121cc21534d1eb9c49f7d193d49d67915b1/src/cpp/getScreenPixels/index.cpp
-
-    if (hwnd == NULL) {
-        Napi::Error::New(env, "Window not found");
-    }
-    
-    HDC const hDc = GetDC(hwnd);
-    HDC const hDcmem = CreateCompatibleDC(hDc);
-    HBITMAP const hBmp = CreateCompatibleBitmap(hDc, width, height);
-    SelectObject(hDcmem, hBmp);
-      
-    BITMAPINFO bmi{};
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = width;
-    bmi.bmiHeader.biHeight = -height; // fuck you fuck you fuck you fuck you
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
-
-	Napi::Buffer<uint32_t> buffer = Napi::Buffer<uint32_t>::New(env, width * height);
-    uint32_t* imageData = buffer.Data();
-
-    BitBlt(hDcmem, 0, 0, width, height, hDc, x, y, SRCCOPY);
-
-    if (!GetDIBits(hDcmem, hBmp, 0, height, imageData, &bmi, DIB_RGB_COLORS)) {
-        Napi::Error::New(env, "GetDIBits failed");
-    }
-
-	// We are given BGRA format, so we must swap it ourselves
-    for (int i = 0; i < width * height; i++) {
-        uint32_t pixel = imageData[i];
-        uint32_t r = (pixel & 0x00FF0000) >> 16;
-        uint32_t b = (pixel & 0x000000FF) << 16;
-        imageData[i] = (pixel & 0xFF00FF00) | r | b;
-    }
-
-    DeleteObject(hBmp);
-    DeleteDC(hDcmem);
-    ReleaseDC(hwnd, hDc);
-
-    return buffer;
-}
-
-Napi::Value GetScreenPixelsMain(const Napi::CallbackInfo& info) {
-	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
+Napi::Value GetScreenPixels(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
 
+    // Validate arguments
     if (info.Length() != 4) {
-        Napi::Error::New(env, "Expected 4 arguments").ThrowAsJavaScriptException();
+        Napi::Error::New(env, "Expected 4 arguments: x, y, width, height")
+            .ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    if (!info[0].IsNumber() || !info[1].IsNumber() || 
+        !info[2].IsNumber() || !info[3].IsNumber()) {
+        Napi::Error::New(env, "Invalid argument types. Expected: number, number, number, number")
+            .ThrowAsJavaScriptException();
+        return env.Null();
     }
 
     int x = info[0].As<Napi::Number>().Int32Value();
@@ -165,19 +164,22 @@ Napi::Value GetScreenPixelsMain(const Napi::CallbackInfo& info) {
     int width = info[2].As<Napi::Number>().Int32Value();
     int height = info[3].As<Napi::Number>().Int32Value();
     
-    auto colors = getScreenPixels(info, x, y, width, height);
-
-    return colors;
+    HWND hwnd = GetDesktopWindow();
+    if (!hwnd) {
+        Napi::Error::New(env, "Failed to get desktop window").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+    
+    return CapturePixels(info, hwnd, x, y, width, height, false);
 }
-
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "getWindowPixels"),
-                Napi::Function::New(env, GetWindowPixelsMain));
+                Napi::Function::New(env, GetWindowPixels));
     exports.Set(Napi::String::New(env, "getScreenPixels"),
-                Napi::Function::New(env, GetScreenPixelsMain));
+                Napi::Function::New(env, GetScreenPixels));
     return exports;
 }
 
-NODE_API_MODULE(NODE_GYP_MODULE_NAME, Init)
+CASHEW_MODULE_INIT(screen, Init)
 

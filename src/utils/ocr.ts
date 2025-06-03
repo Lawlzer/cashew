@@ -5,7 +5,8 @@ interface GetTextOptions {
 	characterWhitelist?: string;
 }
 
-let cachedWorker: Worker;
+let cachedWorker: Worker | undefined;
+
 export class Ocr {
 	public static async getText(imagePath: string, options?: GetTextOptions): Promise<string> {
 		await this.ensureWorkerExists(options);
@@ -15,7 +16,7 @@ export class Ocr {
 	}
 
 	private static async ensureWorkerExists(options?: GetTextOptions): Promise<void> {
-		if (cachedWorker != null) {
+		if (cachedWorker === undefined) {
 			cachedWorker = await createWorker('eng');
 			await cachedWorker.setParameters({
 				tessedit_char_whitelist: options?.characterWhitelist ?? undefined,

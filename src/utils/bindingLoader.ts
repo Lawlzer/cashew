@@ -2,179 +2,179 @@ import { throwError } from '@lawlzer/utils';
 import { createRequire } from 'module';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import * as v from 'valibot';
 
-// Declare global variables for CJS compatibility
-declare const __filename: string;
-declare const __dirname: string;
-declare const require: NodeRequire;
-
-// Helper function to safely check if we're in ESM environment
-function isESMEnvironment(): boolean {
+// Get directory info for both ESM and CJS
+function getDirInfo(): string {
 	try {
-		// Dynamically create a function to check for import.meta.url
-		// This can help bypass static analysis that flags import.meta in CJS
-		// eslint-disable-next-line @typescript-eslint/no-implied-eval
-		const checkMeta = new Function("return typeof import.meta?.url === 'string';");
-		return checkMeta() as boolean;
-	} catch (_e) {
-		// If new Function() is disallowed or import.meta is truly not available in a way that causes an error
-		return false;
-	}
-}
-
-// Helper function to get import.meta.url safely
-function getImportMetaUrl(): string | null {
-	try {
-		// Dynamically create a function to get import.meta.url
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval
 		const getMetaUrl = new Function('return import.meta?.url;');
 		const url = getMetaUrl() as string | undefined;
-		return url ?? null;
-	} catch (_e) {
-		// If new Function() is disallowed or import.meta is not available
-		return null;
-	}
-}
-
-// Helper function to get __filename and __dirname in both ESM and CJS
-function getDirInfo(): { __filename: string; __dirname: string } {
-	// Check if we're in an ESM environment
-	if (isESMEnvironment()) {
-		const importMetaUrl = getImportMetaUrl();
-		if (importMetaUrl !== null) {
-			const filename = fileURLToPath(importMetaUrl);
-			const dirname = path.dirname(filename);
-			return { __filename: filename, __dirname: dirname };
+		if (url !== undefined && url !== null && url.length > 0) {
+			return path.dirname(fileURLToPath(url));
 		}
+	} catch {
+		// Fall through to CJS
 	}
 
-	// We're in a CJS environment - use global variables
-	// Note: In CJS, these globals are always available
-	if (typeof __filename !== 'undefined' && typeof __dirname !== 'undefined') {
-		return { __filename, __dirname };
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-implied-eval
+		const getDirname = new Function('return __dirname;');
+		return getDirname() as string;
+	} catch {
+		throw new Error('Unable to determine current directory');
 	}
-
-	// Fallback - this shouldn't happen in normal usage
-	throw new Error('Unable to determine current file location in either ESM or CJS environment');
 }
 
-// Get the directory info using the helper
-const { __filename: _currentFilename, __dirname: currentDirname } = getDirInfo();
-
-// Create a require function that works in both ESM and CJS
+// Create require function for both ESM and CJS
 function createRequireFunction(): NodeRequire {
-	// Check if we're in an ESM environment
-	if (isESMEnvironment()) {
-		const importMetaUrl = getImportMetaUrl();
-		if (importMetaUrl !== null) {
-			return createRequire(importMetaUrl);
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-implied-eval
+		const getMetaUrl = new Function('return import.meta?.url;');
+		const url = getMetaUrl() as string | undefined;
+		if (url !== undefined && url !== null && url.length > 0) {
+			return createRequire(url);
 		}
+	} catch {
+		// Fall through to CJS
 	}
 
-	// We're in a CJS environment - use the global require
-	if (typeof require !== 'undefined') {
-		return require;
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-implied-eval
+		const getRequire = new Function('return require;');
+		return getRequire() as NodeRequire;
+	} catch {
+		throw new Error('Unable to create require function');
 	}
-
-	// Fallback - this shouldn't happen in normal usage
-	throw new Error('Unable to create require function in either ESM or CJS environment');
 }
 
+const currentDirname = getDirInfo();
 const requireFunction = createRequireFunction();
 
-// Helper function to load native bindings with correct path resolution
-export function loadBinding(name: string): unknown {
-	try {
-		// Try the standard require path first (for development)
-		return requireFunction(name);
-	} catch (error: unknown) {
+// Load native binding with multiple path attempts
+function loadNativeBinding(name: string): unknown {
+	const paths = [name, path.join(currentDirname, '..', 'build', 'Release', `${name}.node`), path.join(currentDirname, '..', '..', 'build', 'Release', `${name}.node`)];
+
+	for (const bindingPath of paths) {
 		try {
-			// Calculate the path to the native binding relative to this module
-			// When the package is installed, the structure is:
-			// node_modules/@lawlzer/cashew/dist/utils/bindingLoader.js
-			// node_modules/@lawlzer/cashew/dist/build/Release/{name}.node
-			const bindingPath = path.join(currentDirname, '..', 'build', 'Release', `${name}.node`);
 			return requireFunction(bindingPath);
-		} catch (_errorPath: unknown) {
-			// Try alternative paths for different installation scenarios
-			try {
-				// For local development or npm link scenarios
-				const devBindingPath = path.join(currentDirname, '..', '..', 'build', 'Release', `${name}.node`);
-				return requireFunction(devBindingPath);
-			} catch (_errorDev: unknown) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
-				throwError(`Could not load ${name} binding. Tried multiple paths. Original error: ${errorMessage}`);
-			}
+		} catch {
+			// Try next path
 		}
 	}
+
+	throwError(`Could not load ${name} binding. Tried paths: ${paths.join(', ')}`);
 }
 
-// Type definition for binding schema - describes expected functions and their signatures
-export type BindingSchema = Record<
-	string,
-	{
-		type: 'function';
-		params?: { name: string; type: string; optional?: boolean }[];
-		returnType?: string;
+// Define schemas using Valibot - using any for now to simplify
+const functionSchema = v.any();
+
+export const screenSchema = v.object({
+	getWindowPixels: functionSchema,
+	getScreenPixels: functionSchema,
+});
+
+export const keyboardSchema = v.object({
+	holdKey: functionSchema,
+	releaseKey: functionSchema,
+	isKeyPressed: functionSchema,
+	type: functionSchema,
+	tapKey: functionSchema,
+});
+
+export const mouseSchema = v.object({
+	click: functionSchema,
+	clickMessage: functionSchema,
+	getPosition: functionSchema,
+	hold: functionSchema,
+	release: functionSchema,
+});
+
+export const miscSchema = v.object({
+	SetForegroundWindow: functionSchema,
+	GetForegroundWindowTitle: functionSchema,
+});
+
+export const clipboardSchema = v.object({
+	ReadClipboard: functionSchema,
+	WriteClipboard: functionSchema,
+	ClipboardPaste: functionSchema,
+});
+
+export const screenRawSchema = v.object({
+	setSquare: functionSchema,
+	clearSquare: functionSchema,
+});
+
+// Create a typed binding loader that validates at runtime
+export function loadBinding<T>(bindingName: string, schema: v.GenericSchema<T>): T {
+	const rawBinding = loadNativeBinding(bindingName);
+
+	// Validate the binding structure
+	const result = v.safeParse(schema, rawBinding);
+
+	if (!result.success) {
+		const issues = result.issues.map((issue) => issue.message).join(', ');
+		throwError(`${bindingName} binding validation failed: ${issues}`);
 	}
->;
 
-// Create a schema-based validator function
-function createSchemaValidator<T>(schema: BindingSchema): (binding: unknown) => binding is T {
-	return (binding: unknown): binding is T => {
-		if (!binding || typeof binding !== 'object') {
-			return false;
-		}
+	// Create proxy to add error handling to each function
+	const binding = result.output as any;
+	const proxiedBinding: any = {};
 
-		const bindingObj = binding as Record<string, any>;
-
-		// Check that all required functions exist and are actually functions
-		for (const [functionName, functionSchema] of Object.entries(schema)) {
-			if (functionSchema.type === 'function') {
-				if (!(functionName in bindingObj) || typeof bindingObj[functionName] !== 'function') {
-					return false;
+	for (const [key, value] of Object.entries(binding)) {
+		if (typeof value === 'function') {
+			proxiedBinding[key] = async (...args: any[]): Promise<any> => {
+				try {
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+					return await value(...args);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					throwError(`${bindingName}.${key} failed: ${message}`);
 				}
-			}
+			};
+		} else {
+			proxiedBinding[key] = value;
 		}
-
-		return true;
-	};
-}
-
-// Generic function to load and validate a typed binding
-export function loadTypedBinding<T extends Record<string, any>>(bindingName: string, schema: BindingSchema, customValidator?: (binding: unknown) => binding is T): T {
-	const rawBinding = loadBinding(bindingName);
-
-	// Use custom validator if provided, otherwise use schema-based validation
-	const isValidBinding = customValidator ? customValidator : createSchemaValidator<T>(schema);
-
-	if (!isValidBinding(rawBinding)) {
-		const expectedFunctions = Object.keys(schema).join(', ');
-		throwError(`${bindingName} binding does not have the expected functions. Expected: ${expectedFunctions}`);
 	}
 
-	return rawBinding;
+	return proxiedBinding as T;
 }
 
-// Convenience function to create a runtime-validated function wrapper
-export function createValidatedFunction<TArgs extends any[], TReturn>(originalFunc: (...args: TArgs) => Promise<TReturn>, functionName: string, expectedReturnType?: string, returnTypeValidator?: (value: unknown) => value is TReturn): (...args: TArgs) => Promise<TReturn> {
-	return async (...args: TArgs): Promise<TReturn> => {
-		const result = await originalFunc(...args);
+// Export type utilities - define the types manually
+export interface ScreenBinding {
+	getWindowPixels: (windowTitle: string, x: number, y: number, width: number, height: number) => Promise<Buffer>;
+	getScreenPixels: (x: number, y: number, width: number, height: number) => Promise<Buffer>;
+}
 
-		// If we have a custom validator, use it
-		if (returnTypeValidator) {
-			if (!returnTypeValidator(result)) {
-				const expectedTypeDesc = expectedReturnType ?? 'custom type';
-				throwError(`${functionName} returned unexpected type. Got: ${typeof result}, Expected: ${expectedTypeDesc}`);
-			}
-		}
-		// Otherwise, do basic type checking if expectedReturnType is provided
-		else if (expectedReturnType != null && expectedReturnType.length > 0) {
-			if (typeof result !== expectedReturnType && result !== null) {
-				throwError(`${functionName} returned unexpected type. Got: ${typeof result}, Expected: ${expectedReturnType}`);
-			}
-		}
+export interface KeyboardBinding {
+	holdKey: (keyCode: number, windowTitle: string) => Promise<void>;
+	releaseKey: (keyCode: number, windowTitle: string) => Promise<void>;
+	isKeyPressed: (keyCode: number) => Promise<boolean>;
+	type: (keycodes: number[], windowTitle: string, delayPerKey: number) => Promise<boolean>;
+	tapKey: (keyCode: number, windowTitle: string) => Promise<void>;
+}
 
-		return result;
-	};
+export interface MouseBinding {
+	click: (x: number | null, y: number | null, button: string, holdFor: number, windowTitle?: string) => Promise<void>;
+	clickMessage: (x: number, y: number, holdFor: number, windowTitle: string, messageType: string) => Promise<void>;
+	getPosition: () => Promise<{ x: number; y: number }>;
+	hold: (x: number | null, y: number | null, button: string) => Promise<void>;
+	release: (x: number | null, y: number | null, button: string) => Promise<void>;
+}
+
+export interface MiscBinding {
+	SetForegroundWindow: (windowTitle: string) => Promise<boolean>;
+	GetForegroundWindowTitle: () => Promise<string | null>;
+}
+
+export interface ClipboardBinding {
+	ReadClipboard: () => Promise<string | null>;
+	WriteClipboard: (text: string) => Promise<boolean>;
+	ClipboardPaste: () => Promise<boolean>;
+}
+
+export interface ScreenRawBinding {
+	setSquare: (x: number, y: number, width: number, height: number, r: number, g: number, b: number) => Promise<boolean>;
+	clearSquare: () => Promise<boolean>;
 }

@@ -1,53 +1,12 @@
-/* eslint-disable @typescript-eslint/restrict-template-expressions */
 import { ensureDirectoryExists, throwError } from '@lawlzer/utils';
-import { loadTypedBinding, type BindingSchema, createValidatedFunction } from './bindingLoader';
+import { loadBinding, screenSchema, type ScreenBinding } from './bindingLoader';
 import sharp from 'sharp';
 
 import { Config } from './config';
 import { isCorrectColour, type Position } from './misc';
 
-interface ScreenBinding {
-	getWindowPixels: (windowTitle: string, x: number, y: number, width: number, height: number) => Promise<Buffer>;
-	getScreenPixels: (x: number, y: number, width: number, height: number) => Promise<Buffer>;
-}
-
-// Define the schema for the screen binding
-const screenBindingSchema: BindingSchema = {
-	getWindowPixels: {
-		type: 'function',
-		params: [
-			{ name: 'windowTitle', type: 'string' },
-			{ name: 'x', type: 'number' },
-			{ name: 'y', type: 'number' },
-			{ name: 'width', type: 'number' },
-			{ name: 'height', type: 'number' },
-		],
-		returnType: 'object', // Buffer
-	},
-	getScreenPixels: {
-		type: 'function',
-		params: [
-			{ name: 'x', type: 'number' },
-			{ name: 'y', type: 'number' },
-			{ name: 'width', type: 'number' },
-			{ name: 'height', type: 'number' },
-		],
-		returnType: 'object', // Buffer
-	},
-};
-
-// Custom validator for ScreenBinding
-function isScreenBinding(binding: unknown): binding is ScreenBinding {
-	return typeof binding === 'object' && binding !== null && 'getWindowPixels' in binding && 'getScreenPixels' in binding && typeof (binding as any).getWindowPixels === 'function' && typeof (binding as any).getScreenPixels === 'function';
-}
-
-// Load the binding with proper typing and validation
-const screenBinding = loadTypedBinding<ScreenBinding>('screen', screenBindingSchema, isScreenBinding);
-
-// Create validated wrapper functions with runtime type checking
-const getWindowPixelsValidated = createValidatedFunction(screenBinding.getWindowPixels, 'getWindowPixels', 'object', (value): value is Buffer => Buffer.isBuffer(value));
-
-const getScreenPixelsValidated = createValidatedFunction(screenBinding.getScreenPixels, 'getScreenPixels', 'object', (value): value is Buffer => Buffer.isBuffer(value));
+// Load the binding with the new Valibot-based loader
+const screenBinding = loadBinding<ScreenBinding>('screen', screenSchema);
 
 export interface rgb {
 	r: number;
@@ -81,7 +40,7 @@ export class Image {
 		this.height = height;
 	}
 
-	public async getPixel(x: number, y: number): Promise<rgb> {
+	public getPixel(x: number, y: number): rgb {
 		if (x >= this.width || y >= this.height) throwError('Pixel coordinates out of bounds');
 
 		const bytesPerPixel = 4; // Since we're using 32-bit RGBA values
@@ -99,7 +58,7 @@ export class Image {
 		const output: number[] = [];
 		for (let y = 0; y < this.height; y++) {
 			for (let x = 0; x < this.width; x++) {
-				const currentPixel = await this.getPixel(x, y);
+				const currentPixel = this.getPixel(x, y);
 				output.push(currentPixel.r, currentPixel.g, currentPixel.b, 255);
 			}
 		}
@@ -119,11 +78,11 @@ export class Image {
 	/**
 	 * Duplicate part of the image into a new Image --- Useful for debugging area snippets.
 	 */
-	public async slice(x: number, y: number, width: number, height: number): Promise<Image> {
+	public slice(x: number, y: number, width: number, height: number): Image {
 		const output: number[] = [];
 		for (let j = y; j < y + height; j++) {
 			for (let i = x; i < x + width; i++) {
-				const currentPixel = await this.getPixel(i, j);
+				const currentPixel = this.getPixel(i, j);
 				output.push(currentPixel.r, currentPixel.g, currentPixel.b, 255);
 			}
 		}
@@ -132,42 +91,61 @@ export class Image {
 		return new Image(buffer, width, height);
 	}
 
-	public async setPixelColour(x: number, y: number, colour: rgb): Promise<void> {
+	public setPixelColour(x: number, y: number, colour: rgb): void {
 		if (x >= this.width || y >= this.height) throwError('Pixel coordinates out of bounds');
 
 		const bytesPerPixel = 4; // Since we're using 32-bit RGBA values
 		const startIdx = (y * this.width + x) * bytesPerPixel;
 
-		this.image.writeUInt8(colour.r, startIdx + 2); // Skip alpha byte
+		this.image.writeUInt8(colour.r, startIdx + 0);
 		this.image.writeUInt8(colour.g, startIdx + 1);
-		this.image.writeUInt8(colour.b, startIdx + 0);
+		this.image.writeUInt8(colour.b, startIdx + 2);
 	}
 
 	/***
 	 * Find all positions with a specific colour
 	 */
-	public async findPositionsWithColour(colour: rgb, maxOffset: number): Promise<Position[]> {
+	public findPositionsWithColour(colour: rgb, maxOffset: number): Position[] {
 		const positions: Position[] = [];
 
 		for (let y = 0; y < this.height; y++) {
 			for (let x = 0; x < this.width; x++) {
-				const currentPixel = await this.getPixel(x, y);
+				const currentPixel = this.getPixel(x, y);
 				if (isCorrectColour(currentPixel, colour, maxOffset)) positions.push({ x, y });
 			}
 		}
 		return positions;
+	}
+
+	/**
+	 * Get all pixels as a flat array for performance-critical operations
+	 */
+	public getAllPixels(): rgb[] {
+		const pixels: rgb[] = [];
+		const bytesPerPixel = 4;
+		const totalPixels = this.width * this.height;
+
+		for (let i = 0; i < totalPixels; i++) {
+			const startIdx = i * bytesPerPixel;
+			pixels.push({
+				r: this.image.readUInt8(startIdx + 0),
+				g: this.image.readUInt8(startIdx + 1),
+				b: this.image.readUInt8(startIdx + 2),
+			});
+		}
+
+		return pixels;
 	}
 }
 
 export class Screen {
 	public static async getSingleScreenPixel(x: number, y: number, windowTitle?: string): Promise<rgb> {
 		const image = await this.initFromScreen(x, y, 1, 1, windowTitle);
-		const pixel = await image.getPixel(0, 0);
-		return pixel;
+		return image.getPixel(0, 0);
 	}
 
 	public static async initFromScreen(x: number, y: number, width: number, height: number, windowTitle?: string): Promise<Image> {
-		const realWindowTitle = windowTitle ?? Config.getProcessConfig().windowTitle;
+		const realWindowTitle = windowTitle ?? Config.windowTitle;
 		const image = await this.getScreen(x, y, width, height, realWindowTitle);
 		return new Image(image, width, height);
 	}
@@ -183,21 +161,13 @@ export class Screen {
 	}
 
 	private static async getScreen(x: number, y: number, width: number, height: number, windowTitle?: string): Promise<Buffer> {
-		if (typeof x !== 'number') throwError(`x is not a number: ${x}`);
-		if (typeof y !== 'number') throwError(`y is not a number: ${y}`);
-		if (typeof width !== 'number') throwError(`width is not a number: ${width}`);
-		if (typeof height !== 'number') throwError(`height is not a number: ${height}`);
-
-		const realWindowTitle = windowTitle ?? Config.getProcessConfig().windowTitle;
+		// Type validation is now handled by the binding loader
+		const realWindowTitle = windowTitle ?? Config.windowTitle;
 
 		if (realWindowTitle !== '' && realWindowTitle !== undefined) {
-			const result: Buffer = await getWindowPixelsValidated(realWindowTitle, x, y, width, height);
-			if (!Buffer.isBuffer(result)) throwError('Result is not a buffer');
-			return result;
+			return screenBinding.getWindowPixels(realWindowTitle, x, y, width, height);
 		}
 
-		const result: Buffer = await getScreenPixelsValidated(x, y, width, height);
-		if (!Buffer.isBuffer(result)) throwError('Result is not a buffer -- this is certainly an issue with @lawlzer/cashew');
-		return result;
+		return screenBinding.getScreenPixels(x, y, width, height);
 	}
 }

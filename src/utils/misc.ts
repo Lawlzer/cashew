@@ -1,47 +1,18 @@
 import { throwError, sleep } from '@lawlzer/utils';
-import { loadTypedBinding, type BindingSchema, createValidatedFunction } from './bindingLoader';
+import { loadBinding, miscSchema, type MiscBinding } from './bindingLoader';
 import { Keyboard } from './keyboard';
 import type { Key } from './keyboard';
 import type { Area, rgb } from './screen';
 
-interface MiscBinding {
-	SetForegroundWindow: (windowTitle: string) => Promise<boolean>;
-	GetForegroundWindowTitle: () => Promise<string | null>;
-}
-
-// Define the schema for the misc binding
-const miscBindingSchema: BindingSchema = {
-	SetForegroundWindow: {
-		type: 'function',
-		params: [{ name: 'windowTitle', type: 'string' }],
-		returnType: 'boolean',
-	},
-	GetForegroundWindowTitle: {
-		type: 'function',
-		params: [],
-		returnType: 'string', // Note: can also return null, handled in validator
-	},
-};
-
-// Custom validator for MiscBinding that handles the specific return types
-function isMiscBinding(binding: unknown): binding is MiscBinding {
-	return typeof binding === 'object' && binding !== null && 'SetForegroundWindow' in binding && 'GetForegroundWindowTitle' in binding && typeof (binding as any).SetForegroundWindow === 'function' && typeof (binding as any).GetForegroundWindowTitle === 'function';
-}
-
-// Load the binding with proper typing and validation
-const miscBinding = loadTypedBinding<MiscBinding>('misc', miscBindingSchema, isMiscBinding);
-
-// Create validated wrapper functions with runtime type checking
-const setForegroundWindowValidated = createValidatedFunction(miscBinding.SetForegroundWindow, 'SetForegroundWindow', 'boolean');
-
-const getForegroundWindowTitleValidated = createValidatedFunction(miscBinding.GetForegroundWindowTitle, 'GetForegroundWindowTitle', 'string', (value: unknown): value is string | null => typeof value === 'string' || value === null);
+// Load the binding with the new Valibot-based loader
+const miscBinding = loadBinding<MiscBinding>('misc', miscSchema);
 
 export async function setForegroundWindow(windowTitle: string): Promise<boolean> {
-	return setForegroundWindowValidated(windowTitle);
+	return miscBinding.SetForegroundWindow(windowTitle);
 }
 
 export async function getForegroundWindowTitle(): Promise<string> {
-	const result = await getForegroundWindowTitleValidated();
+	const result = await miscBinding.GetForegroundWindowTitle();
 	if (result === null) throwError('Failed to get foreground window title');
 	return result;
 }
