@@ -22,15 +22,14 @@
 	"types": "./dist/index.d.ts",
 	"files": [
 		"src",
-		"build",
 		"dist"
 	],
 	"scripts": {
-		"build": "npm run clean && npm run build:cpp && npm-run-all --parallel build:js build:types",
+		"build": "npm run clean && npm run build:types && npm run build:js",
 		"build:cpp": "node-gyp configure && node-gyp build",
-		"build:js": "bun build.ts",
-		"build:types": "tsc --project tsconfig.build.json --emitDeclarationOnly --declaration --declarationMap --outDir ./dist --rootDir ./src",
-		"clean": "rimraf ./dist build",
+		"build:js": "tsup --config ./.config/tsup.config.ts",
+		"build:types": "tsc --emitDeclarationOnly --declaration --declarationMap --outDir ./dist --rootDir ./src",
+		"clean": "rimraf ./dist",
 		"lint": "lint-staged",
 		"lint:all": "npm run lint:eslint && npm run lint:prettier",
 		"lint:eslint": "eslint --fix --config ./.config/.eslint.config.mjs",
@@ -42,7 +41,8 @@
 		"performanceTest": "npm run build && bun run test.ts",
 		"pre-commit": "cross-env LINT_STAGED_COMMIT=true lint-staged -c ./.config/lint-staged.config.mjs",
 		"prepare": "husky",
-		"publish:all": "npm run build && npm publish --access=public && echo \"Successfully published to NPM!\""
+		"publish:all": "npm run build && npm run test && npm publish --access=public && echo \"Successfully published to NPM!\"",
+		"test": "bun test"
 	},
 	"prettier": "./.config/.prettierrc.mjs",
 	"dependencies": {
@@ -57,9 +57,7 @@
 		"@types/ms": "^2.1.0",
 		"@types/node": "^22.15.29",
 		"@typescript-eslint/parser": "^8.33.1",
-		"bun-plugin-dts": "^0.3.0",
 		"cross-env": "^7.0.3",
-		"esbuild": "^0.25.5",
 		"eslint": "^9.28.0",
 		"eslint-plugin-import": "^2.31.0",
 		"eslint-plugin-simple-import-sort": "^12.1.1",
@@ -75,6 +73,7 @@
 		"rimraf": "^6.0.1",
 		"sharp": "^0.34.2",
 		"tesseract.js": "^6.0.1",
+		"tsup": "^8.5.0",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "^8.33.1"
 	},
