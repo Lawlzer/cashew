@@ -33,5 +33,6 @@
 			"src/*": ["src/*"],
 			"@testUtils/*": ["testUtils/*"]
 		}
-	}
+	},
+	"exclude": ["build.ts", "dist"]
 }
