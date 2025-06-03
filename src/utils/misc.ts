@@ -116,26 +116,22 @@ export function getAreaOfPositions(positions: Position[]): Area {
 export interface InitToggleMonitorParams {
 	key: Key;
 	func: (newState: boolean) => void;
-	onMessage: string | false | null;
-	offMessage: string | false | null;
+	onMessage?: string | false | null;
+	offMessage?: string | false | null;
 	initialState?: boolean;
 	pollingInterval?: number;
+	postToggleDelayMs?: number;
 }
 
-// Map to store the last known state of keys for edge detection in polling
-// This allows multiple independent monitors.
 const keyPressStates = new Map<Key, boolean>();
-
-// Initializes a toggle monitor that watches for key presses and toggles state.
-// Each key press toggles between on/off states and calls the provided function.
-// The monitor runs in the background.
 export async function initToggleMonitor({
-	key,
+	key, //
 	func,
 	onMessage = null,
 	offMessage = null,
-	initialState = false, // Default to OFF
-	pollingInterval = 50, // Default to 50ms
+	initialState = false,
+	pollingInterval = 20,
+	postToggleDelayMs = 250,
 }: InitToggleMonitorParams): Promise<void> {
 	let isActive = initialState;
 
@@ -147,7 +143,6 @@ export async function initToggleMonitor({
 		console.info(`Initializing toggle monitor for key "${key}". Initial state: ${isActive ? 'ON' : 'OFF'}. (Custom messages disabled)`);
 	}
 
-	// Attempt to get initial key state.
 	try {
 		keyPressStates.set(key, await Keyboard.isKeyPressed(key));
 	} catch (e) {
@@ -171,6 +166,7 @@ export async function initToggleMonitor({
 					} else if (!isActive && typeof offMessage === 'string') {
 						console.info(offMessage);
 					}
+					await sleep(postToggleDelayMs); // Wait after processing the toggle
 				}
 				keyPressStates.set(key, currentKeyState); // Update the stored state for this key
 				await sleep(pollingInterval);
