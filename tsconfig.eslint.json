@@ -1,6 +1,6 @@
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {},
-	"include": ["./src", "./.config", "./test-utils", "./.config/tsup.config.ts"],
+	"include": ["./src", "./.config", "./test-utils", "./.config/tsup.config.ts", "./build.ts"],
 	"exclude": []
 }

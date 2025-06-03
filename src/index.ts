@@ -10,5 +10,6 @@ export * from './utils/misc';
 export * from './utils/ocr';
 export * from './utils/config';
 
-// Re-export binding types for users who need them
+// Re-export binding types and utilities for users who need them
 export type { ScreenBinding, KeyboardBinding, MouseBinding, MiscBinding, ClipboardBinding, ScreenRawBinding } from './utils/bindingLoader';
+export { loadBinding, screenSchema, keyboardSchema, mouseSchema, miscSchema, clipboardSchema, screenRawSchema } from './utils/bindingLoader';

@@ -2,7 +2,7 @@
 
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import path from 'node:path';
+import prettierConfig from 'eslint-config-prettier';
 
 const commit = process.env.LINT_STAGED_COMMIT === 'true';
 
@@ -18,7 +18,7 @@ export default tseslint.config(
 		languageOptions: {
 			parser: tseslint.parser,
 			parserOptions: {
-				project: path.resolve(import.meta.dirname, '..', 'tsconfig.eslint.json'),
+				project: './tsconfig.eslint.json',
 			},
 		},
 		rules: {
@@ -218,39 +218,15 @@ export default tseslint.config(
 			'@typescript-eslint/no-unnecessary-type-constraint': ['error'], // experimental
 			'@typescript-eslint/no-unsafe-declaration-merging': ['error'], // experimental
 			'@typescript-eslint/unbound-method': ['error'], // experimental
-
-			// These are done in Prettier
-			'@typescript-eslint/allowIndentationTabs': ['off'],
-			'@typescript-eslint/block-spacing': ['off'],
-			'@typescript-eslint/comma-dangle': ['off'],
-			'@typescript-eslint/comma-spacing': ['off'],
-			'@typescript-eslint/func-call-spacing': ['off'],
-			'@typescript-eslint/indent': ['off'],
-			'@typescript-eslint/key-spacing': ['off'],
-			'@typescript-eslint/keyword-spacing': ['off'],
-			'@typescript-eslint/lines-around-comment': ['off'],
-			'@typescript-eslint/lines-between-class-members': ['off'],
-			'@typescript-eslint/member-delimiter-style': ['off'],
-			'@typescript-eslint/no-extra-parens': ['off'],
-			'@typescript-eslint/no-extra-semi': ['off'],
-			'@typescript-eslint/no-mixed-spaces-and-tabs': ['off'],
-			'@typescript-eslint/no-trailing-spaces': ['off'],
-			'@typescript-eslint/object-curly-spacing': ['off'],
-			'@typescript-eslint/padding-line-between-statements': ['off'],
-			'@typescript-eslint/quotes': ['off'],
-			'@typescript-eslint/semi': ['off'],
-			'@typescript-eslint/space-before-blocks': ['off'],
-			'@typescript-eslint/space-before-function-paren': ['off'],
-			'@typescript-eslint/space-infix-ops': ['off'],
-			'@typescript-eslint/type-annotation-spacing': ['off'],
 		},
 	},
 
 	{
-		files: ['**/*.test.ts'],
+		files: ['**/*.test.ts', '**/*.test.tsx'],
 		rules: {
 			'@typescript-eslint/no-unsafe-call': ['off'],
 			'@typescript-eslint/no-confusing-void-expression': ['off'],
+			'react/jsx-no-bind': ['off'], // More flexibility in tests
 		},
 	},
 
@@ -258,5 +234,9 @@ export default tseslint.config(
 		linterOptions: {
 			reportUnusedDisableDirectives: true,
 		},
-	}
+	},
+
+	// IMPORTANT: prettier config must be last to disable all conflicting rules
+	// This prevents ESLint and Prettier from fighting over formatting
+	prettierConfig
 );

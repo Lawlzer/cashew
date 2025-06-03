@@ -4,30 +4,184 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import * as v from 'valibot';
 
+// Helper function to require modules dynamically
+
+function dynamicRequire(moduleId: string): any {
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	return require(moduleId);
+}
+
 // Get directory info for both ESM and CJS
 function getDirInfo(): string {
+	// Strategy 1: Try using require.resolve to find our package
 	try {
+		// Check if we're in Bun and require is available
+		if (typeof Bun !== 'undefined' && typeof require !== 'undefined') {
+			try {
+				// Try to resolve our own package
+
+				const resolved = require.resolve('@lawlzer/cashew/package.json');
+				return path.dirname(resolved);
+			} catch {
+				// Package might not be installed as a dependency
+			}
+		}
+
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval
-		const getMetaUrl = new Function('return import.meta?.url;');
-		const url = getMetaUrl() as string | undefined;
-		if (url !== undefined && url !== null && url.length > 0) {
-			return path.dirname(fileURLToPath(url));
+		const getRequire = new Function('return typeof require !== "undefined" ? require : null;');
+		const req = getRequire() as NodeRequire | null;
+		if (req) {
+			try {
+				// Try to resolve our own package
+				const resolved = req.resolve('@lawlzer/cashew/package.json');
+				return path.dirname(resolved);
+			} catch {
+				// Package might not be installed as a dependency
+			}
 		}
 	} catch {
-		// Fall through to CJS
+		// Fall through
 	}
 
+	// Strategy 2: Try to find the package using import.meta.resolve (for ESM)
 	try {
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval
-		const getDirname = new Function('return __dirname;');
-		return getDirname() as string;
+		const getImportMeta = new Function('return import.meta;');
+		const importMeta = getImportMeta();
+		if (importMeta?.resolve) {
+			try {
+				const resolved = importMeta.resolve('@lawlzer/cashew/package.json');
+				const resolvedPath = resolved.startsWith('file://') ? fileURLToPath(resolved) : resolved;
+				return path.dirname(resolvedPath);
+			} catch {
+				// Fall through
+			}
+		}
 	} catch {
-		throw new Error('Unable to determine current directory');
+		// Fall through
 	}
+
+	// Strategy 3: Try to find via module paths
+	try {
+		// Check if we're in Bun and can access modules directly
+		if (typeof Bun !== 'undefined' && typeof require !== 'undefined') {
+			const Module = dynamicRequire('module');
+			const fs = dynamicRequire('fs');
+			const paths = Module._nodeModulePaths?.(process.cwd()) || [];
+
+			for (const modulePath of paths) {
+				const packagePath = path.join(modulePath, '@lawlzer', 'cashew');
+				try {
+					if (fs.existsSync(path.join(packagePath, 'package.json'))) {
+						return packagePath;
+					}
+				} catch {
+					// Continue searching
+				}
+			}
+		} else {
+			// Fallback to existing method for non-Bun environments
+
+			const Module = dynamicRequire('module');
+			const paths = Module._nodeModulePaths?.(process.cwd()) || [];
+
+			for (const modulePath of paths) {
+				const packagePath = path.join(modulePath, '@lawlzer', 'cashew');
+				try {
+					const fs = dynamicRequire('fs');
+					if (fs.existsSync(path.join(packagePath, 'package.json'))) {
+						return packagePath;
+					}
+				} catch {
+					// Continue searching
+				}
+			}
+		}
+	} catch {
+		// Fall through
+	}
+
+	// Strategy 4: Use process.cwd() as base and search for bindings
+	// This is the most reliable for bundled code
+	const cwd = process.cwd();
+
+	// Common locations to search relative to cwd
+	const searchDirs = [
+		cwd,
+		path.dirname(process.argv[1] || cwd), // Script location
+		path.join(cwd, 'node_modules', '@lawlzer', 'cashew'),
+		path.join(cwd, '..', 'node_modules', '@lawlzer', 'cashew'),
+		path.join(cwd, '..', '..', 'node_modules', '@lawlzer', 'cashew'),
+		// Add paths for when running from dist
+		path.join(cwd, 'dist'),
+		path.join(cwd, '..'),
+		path.join(cwd, '..', '..'),
+	];
+
+	// For each search directory, check common build output locations
+	for (const searchDir of searchDirs) {
+		const candidates = [
+			searchDir, // The directory itself
+			path.join(searchDir, 'dist'),
+			path.join(searchDir, 'build'),
+		];
+
+		for (const candidate of candidates) {
+			// Check if this looks like the right directory by checking for expected structure
+			try {
+				// Check if we're in Bun and can use fs directly
+
+				const fs = typeof Bun !== 'undefined' && typeof require !== 'undefined' ? dynamicRequire('fs') : dynamicRequire('fs');
+
+				// Check if build/Release exists (where .node files are)
+				const releaseDir = path.join(candidate, '..', 'build', 'Release');
+				if (fs.existsSync(releaseDir)) {
+					// Verify at least one .node file exists
+					const files = fs.readdirSync(releaseDir);
+					if (files.some((f: string) => f.endsWith('.node'))) {
+						return path.dirname(releaseDir); // Return the package root
+					}
+				}
+
+				// Also check if build/Release is directly under candidate
+				const directReleaseDir = path.join(candidate, 'build', 'Release');
+				if (fs.existsSync(directReleaseDir)) {
+					const files = fs.readdirSync(directReleaseDir);
+					if (files.some((f: string) => f.endsWith('.node'))) {
+						return candidate; // Return the package root
+					}
+				}
+			} catch {
+				// Continue searching
+			}
+		}
+	}
+
+	// Final fallback: just use cwd
+	// The binding loader will have to figure out the paths
+	return cwd;
 }
 
 // Create require function for both ESM and CJS
 function createRequireFunction(): NodeRequire {
+	// Check if we're in Bun and require is available
+	if (typeof Bun !== 'undefined' && typeof require !== 'undefined') {
+		return require;
+	}
+
+	// Try to get require function
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-implied-eval
+		const getRequire = new Function('return typeof require !== "undefined" ? require : null;');
+		const req = getRequire() as NodeRequire | null;
+		if (req) {
+			return req;
+		}
+	} catch {
+		// Fall through
+	}
+
+	// Try to create require from import.meta.url
 	try {
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval
 		const getMetaUrl = new Function('return import.meta?.url;');
@@ -36,26 +190,109 @@ function createRequireFunction(): NodeRequire {
 			return createRequire(url);
 		}
 	} catch {
-		// Fall through to CJS
+		// Fall through
 	}
 
-	try {
-		// eslint-disable-next-line @typescript-eslint/no-implied-eval
-		const getRequire = new Function('return require;');
-		return getRequire() as NodeRequire;
-	} catch {
-		throw new Error('Unable to create require function');
+	// For Bun, try to use Bun.require if available
+	if (typeof Bun !== 'undefined' && (Bun as any).require) {
+		return (Bun as any).require as NodeRequire;
 	}
+
+	// Create a minimal require function that throws helpful errors
+	// This ensures we fail gracefully when require is not available
+	const mockRequire = ((id: string) => {
+		if (id.endsWith('.node')) {
+			throw new Error(`Cannot load native module ${id} - require not available in this environment`);
+		}
+		throw new Error(`Cannot require ${id} - require not available in this environment`);
+	}) as any;
+
+	mockRequire.resolve = (id: string) => {
+		throw new Error(`Cannot resolve ${id} - require not available in this environment`);
+	};
+
+	return mockRequire as NodeRequire;
 }
 
-const currentDirname = getDirInfo();
 const requireFunction = createRequireFunction();
 
 // Load native binding with multiple path attempts
 function loadNativeBinding(name: string): unknown {
-	const paths = [name, path.join(currentDirname, '..', 'build', 'Release', `${name}.node`), path.join(currentDirname, '..', '..', 'build', 'Release', `${name}.node`)];
+	const packageRoot = getDirInfo();
+	const bindingName = `${name}.node`;
 
-	for (const bindingPath of paths) {
+	// Build comprehensive list of paths to try
+	const paths = [
+		// Direct require attempts
+		name,
+		bindingName,
+
+		// Paths relative to package root
+		path.join(packageRoot, 'build', 'Release', bindingName),
+		path.join(packageRoot, 'build', 'Debug', bindingName),
+
+		// Paths relative to current directory (for when running from source)
+		path.join(process.cwd(), 'build', 'Release', bindingName),
+		path.join(process.cwd(), 'build', 'Debug', bindingName),
+
+		// For when the package is installed as a dependency
+		path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+		path.join(process.cwd(), '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+		path.join(process.cwd(), '..', '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+
+		// Legacy paths for compatibility
+		path.join(packageRoot, '..', 'build', 'Release', bindingName),
+		path.join(packageRoot, '..', '..', 'build', 'Release', bindingName),
+	];
+
+	// Add Bun-specific paths
+	if (typeof Bun !== 'undefined') {
+		// Bun might resolve modules differently, add more potential paths
+		const scriptDir = path.dirname(process.argv[1] || process.cwd());
+		paths.push(
+			// Try relative to the script location
+			path.join(scriptDir, 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+			path.join(scriptDir, '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+			// Windows specific paths
+			path.join('A:', 'misc', 'cashew', 'build', 'Release', bindingName),
+			path.join('C:', 'misc', 'cashew', 'build', 'Release', bindingName)
+		);
+	}
+
+	// Remove duplicates while preserving order
+	const uniquePaths = [...new Set(paths)];
+
+	// Try to find which paths actually exist (for better error reporting)
+	const existingPaths: string[] = [];
+	try {
+		// Check if we're in Bun and can use fs directly
+
+		const fs = typeof Bun !== 'undefined' && typeof require !== 'undefined' ? dynamicRequire('fs') : dynamicRequire('fs');
+		for (const p of uniquePaths) {
+			try {
+				if (fs.existsSync(p)) {
+					existingPaths.push(p);
+				}
+			} catch {
+				// Ignore errors checking existence
+			}
+		}
+	} catch {
+		// fs not available, skip existence check
+	}
+
+	// Try to load from existing paths first
+	for (const bindingPath of existingPaths) {
+		try {
+			return requireFunction(bindingPath);
+		} catch (err) {
+			// Log but continue trying
+			console.warn(`Failed to load ${bindingPath}:`, err instanceof Error ? err.message : err);
+		}
+	}
+
+	// Try all paths (in case fs.existsSync didn't work)
+	for (const bindingPath of uniquePaths) {
 		try {
 			return requireFunction(bindingPath);
 		} catch {
@@ -63,7 +300,9 @@ function loadNativeBinding(name: string): unknown {
 		}
 	}
 
-	throwError(`Could not load ${name} binding. Tried paths: ${paths.join(', ')}`);
+	// Provide helpful error message
+	const errorMessage = `Could not load ${name} binding. Searched paths:\n${uniquePaths.map((p) => `  - ${p}`).join('\n')}\n\nMake sure the native bindings are built (npm run build:cpp) and the package is properly installed.`;
+	throwError(errorMessage);
 }
 
 // Define schemas using Valibot - using any for now to simplify
