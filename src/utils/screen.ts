@@ -1,7 +1,7 @@
 import { ensureDirectoryExists, throwError } from '@lawlzer/utils';
-import { loadBinding, screenSchema, type ScreenBinding } from './bindingLoader';
 import sharp from 'sharp';
 
+import { loadBinding, type ScreenBinding, screenSchema } from './bindingLoader';
 import { Config } from './config';
 import { isCorrectColour, type Position } from './misc';
 
@@ -154,8 +154,8 @@ export class Screen {
 		const img = await sharp(path).raw().toBuffer({ resolveWithObject: true });
 
 		const imgData = img.data;
-		const width = img.info.width;
-		const height = img.info.height;
+		const { width } = img.info;
+		const { height } = img.info;
 		const buffer: Buffer = Buffer.from(imgData);
 		return new Image(buffer, width, height);
 	}

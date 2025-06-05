@@ -6,6 +6,7 @@ interface GetTextOptions {
 }
 
 let cachedWorker: Worker | undefined;
+let workerInitPromise: Promise<Worker> | undefined;
 
 export class Ocr {
 	public static async getText(imagePath: string, options?: GetTextOptions): Promise<string> {
@@ -16,12 +17,21 @@ export class Ocr {
 	}
 
 	private static async ensureWorkerExists(options?: GetTextOptions): Promise<void> {
-		if (cachedWorker === undefined) {
-			cachedWorker = await createWorker('eng');
-			await cachedWorker.setParameters({
-				tessedit_char_whitelist: options?.characterWhitelist ?? undefined,
-				user_defined_dpi: '300',
+		if (cachedWorker) {
+			return;
+		}
+
+		if (!workerInitPromise) {
+			workerInitPromise = createWorker('eng').then(async (worker) => {
+				await worker.setParameters({
+					tessedit_char_whitelist: options?.characterWhitelist ?? undefined,
+					user_defined_dpi: '300',
+				});
+				cachedWorker = worker;
+				return worker;
 			});
 		}
+
+		await workerInitPromise;
 	}
 }

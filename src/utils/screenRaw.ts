@@ -1,5 +1,6 @@
 import { throwError } from '@lawlzer/utils';
-import { loadBinding, screenRawSchema, type ScreenRawBinding } from './bindingLoader';
+
+import { loadBinding, type ScreenRawBinding, screenRawSchema } from './bindingLoader';
 import type { Position } from './misc';
 import type { rgb } from './screen';
 

@@ -1,7 +1,8 @@
-import { throwError, sleep } from '@lawlzer/utils';
-import { loadBinding, miscSchema, type MiscBinding } from './bindingLoader';
-import { Keyboard } from './keyboard';
+import { sleep, throwError } from '@lawlzer/utils';
+
+import { loadBinding, type MiscBinding, miscSchema } from './bindingLoader';
 import type { Key } from './keyboard';
+import { Keyboard } from './keyboard';
 import type { Area, rgb } from './screen';
 
 // Load the binding with the new Valibot-based loader

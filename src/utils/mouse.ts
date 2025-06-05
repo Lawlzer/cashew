@@ -1,6 +1,6 @@
 import { throwError } from '@lawlzer/utils';
-import { loadBinding, mouseSchema, type MouseBinding } from './bindingLoader';
 
+import { loadBinding, type MouseBinding, mouseSchema } from './bindingLoader';
 import type { Position } from './misc';
 
 // Load the binding with the new Valibot-based loader

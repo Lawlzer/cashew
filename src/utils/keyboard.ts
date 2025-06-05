@@ -1,6 +1,6 @@
 import { sleep, throwError } from '@lawlzer/utils';
-import { loadBinding, keyboardSchema, type KeyboardBinding } from './bindingLoader';
 
+import { type KeyboardBinding, keyboardSchema, loadBinding } from './bindingLoader';
 import { Config } from './config';
 
 // Load the binding with the new Valibot-based loader
