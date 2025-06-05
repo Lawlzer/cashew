@@ -30,7 +30,7 @@
 		"build:cpp": "node-gyp configure && node-gyp build",
 		"build:js": "tsup --config ./.config/tsup.config.ts",
 		"build:types": "tsc --emitDeclarationOnly --declaration --declarationMap --outDir ./dist --rootDir ./src",
-		"clean": "rimraf ./dist",
+		"clean": "rimraf ./dist ./build",
 		"lint": "lint-staged",
 		"lint:all": "npm run lint:eslint && npm run lint:prettier",
 		"lint:eslint": "eslint --fix --config ./.config/.eslint.config.mjs",
@@ -47,7 +47,7 @@
 	},
 	"prettier": "./.config/.prettierrc.mjs",
 	"dependencies": {
-		"@lawlzer/utils": "^4.0.1",
+		"@lawlzer/utils": "^4.0.2",
 		"fs-extra": "^11.3.0",
 		"jsonc-parser": "^3.3.1",
 		"valibot": "^1.1.0"
@@ -58,7 +58,7 @@
 		"@types/ms": "^2.1.0",
 		"@types/node": "^22.15.29",
 		"@types/react": "^19.1.6",
-		"@types/react-dom": "^19.1.5",
+		"@types/react-dom": "^19.1.6",
 		"@typescript-eslint/parser": "^8.33.1",
 		"cross-env": "^7.0.3",
 		"eslint": "^9.28.0",
