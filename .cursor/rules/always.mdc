@@ -1,0 +1,21 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Development Guidelines
+
+## Code Reuse
+- Search for existing utilities in project before creating new ones
+- Check @lawlzer/utils package first (if a TypeScript repo/file)
+- Create new functions only after confirming they don't exist
+
+## Temporary Files
+- Use `./temp/ai/` for all temporary/testing files
+- Create subdirectories as needed
+
+## Communication
+- Provide suggestions even if unrelated to current task
+- Ask clarifying questions when information is missing
+- Prioritize clean, self-documenting code
+

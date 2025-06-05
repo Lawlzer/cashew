@@ -1,0 +1,16 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Workflow Execution
+
+Always start by managing the workflow:
+
+1. **Check** `./plans/current.md`
+2. **If exists**: Read to understand progress
+3. **If missing**: Create using workflow.mdc template
+4. **Execute** the user's request
+5. **Update** the plan after each task completion
+
+Begin checking the plan file now.

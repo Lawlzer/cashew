@@ -3,6 +3,8 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettierConfig from 'eslint-config-prettier';
+import unusedImports from 'eslint-plugin-unused-imports';
+import simpleImportSort from 'eslint-plugin-simple-import-sort';
 
 const commit = process.env.LINT_STAGED_COMMIT === 'true';
 
@@ -14,6 +16,8 @@ export default tseslint.config(
 		files: ['**/*.ts', '**/*.tsx'],
 		plugins: {
 			'@typescript-eslint': tseslint.plugin,
+			'unused-imports': unusedImports,
+			'simple-import-sort': simpleImportSort,
 		},
 		languageOptions: {
 			parser: tseslint.parser,
@@ -35,6 +39,34 @@ export default tseslint.config(
 						},
 					]
 				: ['off'],
+
+			// Import sorting - automatically sorts imports
+			'simple-import-sort/imports': [
+				'error',
+				{
+					groups: [
+						// Node.js builtins prefixed with `node:`
+						['^node:'],
+						// Packages starting with @, then other packages
+						['^@?\\w'],
+						// Internal packages (your own @company packages)
+						['^@company'],
+						// Side effect imports
+						['^\\u0000'],
+						// Parent imports. Put `..` last
+						['^\\.\\.(?!/?$)', '^\\.\\./?$'],
+						// Other relative imports. Put same-folder imports and `.` last
+						['^\\./(?=.*/)(?!/?$)', '^\\.(?!/?$)', '^\\./?$'],
+						// Style imports
+						['^.+\\.s?css$'],
+					],
+				},
+			],
+			'simple-import-sort/exports': 'error',
+
+			// Unused imports configuration - automatically removes unused imports when commit=true
+			'unused-imports/no-unused-imports': commit ? ['error'] : ['off'], // Auto-fix removes unused imports
+			'unused-imports/no-unused-vars': ['off'], // We'll let the TypeScript rule handle unused variables
 
 			'@typescript-eslint/adjacent-overload-signatures': ['error'],
 			'@typescript-eslint/array-type': ['error'],
@@ -212,6 +244,34 @@ export default tseslint.config(
 			'prefer-rest-params': ['error'],
 			'prefer-spread': ['error'],
 			'require-await': ['off'],
+
+			// Enhanced general rules for better code quality
+			'arrow-body-style': ['error', 'as-needed'],
+			curly: ['error', 'multi-line', 'consistent'],
+			eqeqeq: ['error', 'always', { null: 'ignore' }],
+			'no-constant-binary-expression': 'error',
+			'no-constructor-return': 'error',
+			'no-lonely-if': 'error',
+			'no-promise-executor-return': 'error',
+			'no-self-compare': 'error',
+			'no-template-curly-in-string': 'error',
+			'no-unmodified-loop-condition': 'error',
+			'no-unreachable-loop': 'error',
+			'no-unused-private-class-members': 'error',
+			'no-use-before-define': ['error', { functions: false, classes: true, variables: true }],
+			'no-unneeded-ternary': ['error', { defaultAssignment: false }],
+			'operator-assignment': ['error', 'always'],
+			'prefer-arrow-callback': ['error', { allowNamedFunctions: false, allowUnboundThis: true }],
+			'prefer-destructuring': [
+				'error',
+				{
+					VariableDeclarator: { array: false, object: true },
+					AssignmentExpression: { array: false, object: false },
+				},
+			],
+			'prefer-template': 'error',
+			'require-atomic-updates': 'error',
+			yoda: ['error', 'never'],
 
 			// Experimental, may change
 			'@typescript-eslint/no-duplicate-enum-values': ['error'], // experimental

@@ -1,0 +1,36 @@
+---
+description: 
+globs: *.tsx,*.ts,*.jsx,*.js
+alwaysApply: false
+---
+# TypeScript Patterns
+
+## Core Principles
+- Let errors crash naturally - no try/catch blocks
+- Use async/await for asynchronous operations
+- Write self-documenting code with clear naming
+
+## Common @lawlzer/utils
+- `sleep(ms)` - Async delay
+- Array/Object utilities - map, filter, merge, clone, pick, omit
+- Type guards - isString, isNumber, isObject
+- Validators - email, URL, phone
+
+## Console Logging
+- `console.log` - Temporary debugging
+- `console.info` - General information
+- `console.debug` - Edge cases or unusual situations
+
+## Best Practices
+- Match existing code style
+- Inline single-use logic
+
+
+
+
+
+
+
+
+
+

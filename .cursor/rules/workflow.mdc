@@ -1,0 +1,87 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# AI Workflow Management Rules
+
+## Plan File System
+
+### Location
+- Maintain current workflow at `./plans/current.md`
+- Create `./plans/` directory if it doesn't exist
+
+### Plan Structure Template
+
+```markdown
+# [Task/Project Title]
+
+## 🎯 Overview
+[Brief description of what we're building/implementing]
+
+### Key Context
+- **Purpose**: [Why this is needed]
+- **Current State**: [What exists now]
+- **Goal**: [What we want to achieve]
+
+## 📊 Current Status
+
+| Component/Task | Status | Priority | Notes |
+|----------------|--------|----------|-------|
+| [Task 1] | 🟢 Complete | P0 | [Notes] |
+| [Task 2] | 🟡 In Progress | P1 | [Notes] |
+| [Task 3] | 🔴 Not Started | P2 | [Notes] |
+
+## 📋 Implementation Phases
+
+### Phase 1: [Name] [Status]
+**Goal**: [What this phase accomplishes]
+
+- [ ] Task 1
+- [ ] Task 2
+- [x] Task 3 (completed)
+
+### Phase 2: [Name] [Status]
+**Goal**: [What this phase accomplishes]
+
+- [ ] Task 1
+- [ ] Task 2
+
+## 📝 Notes and Decisions
+[Document important decisions and technical details]
+
+## 📊 Progress Tracking
+**Last Updated**: [YYYY-MM-DD HH:MM]
+**Current Phase**: [Phase name]
+**Next Task**: [What to do next]
+**Blockers**: [Any blockers]
+
+## ✅ Completed Tasks
+### [Date] - [What was completed]
+- Details of work done
+```
+
+## Update Rules
+
+### When to Update
+- **Immediately after** completing any task
+- **When starting** a new phase
+- **When encountering** blockers
+- **When making** important technical decisions
+
+### How to Update
+1. Check completed tasks: `- [x]`
+2. Update status emojis in table
+3. Update "Last Updated" timestamp
+4. Move completed phases to "Completed Tasks"
+5. Update "Next Task" to guide continuation
+
+## Status Indicators
+- 🟢 Complete - Task fully implemented
+- 🟡 In Progress - Currently working on
+- 🔴 Not Started - Not begun
+- 🔵 Blocked - Cannot proceed
+
+## Archive Protocol
+When project completes:
+1. Move `current.md` to `./plans/archive/[YYYY-MM-DD]-[project-name].md`

@@ -1,0 +1,12 @@
+---
+description: 
+globs: *.mdc
+alwaysApply: false
+---
+# Cursor Rule Writing Guidelines
+
+## Writing Style
+- Use positive directives specifying desired actions
+- Frame instructions as what to do, not what to avoid
+- Be direct and action-oriented
+- Keep rules concise and clear

@@ -12,7 +12,6 @@ build
 dist
 out
 output
-lib
 zig-out
 zig-cache
 serverOutput
@@ -57,3 +56,5 @@ model_cache/
 **/model_cache/**
 whisper-openai-exp/
 feature_cache
+plans
+
