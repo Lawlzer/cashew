@@ -9,6 +9,36 @@ alwaysApply: false
 - Let errors crash naturally - no try/catch blocks
 - Use async/await for asynchronous operations
 - Write self-documenting code with clear naming
+- After writing code, if the repository has testing, implement tests, and then run "npm run test" to verify functionality.
+
+### Examples:
+```typescript
+// ✅ GOOD - Let errors crash naturally
+async function fetchUserData(userId: string) {
+  const response = await fetch(`/api/users/${userId}`);
+  const data = await response.json();
+  return data;
+}
+
+// ❌ BAD - Unnecessary try/catch
+async function fetchUserData(userId: string) {
+  try {
+    const response = await fetch(`/api/users/${userId}`);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
+// ✅ GOOD - Self-documenting code
+const isUserEligibleForDiscount = (user: User) => 
+  user.accountAge > 365 && user.totalPurchases > 1000;
+
+// ❌ BAD - Unclear naming
+const check = (u: User) => u.age > 365 && u.tp > 1000;
+```
 
 ## Common @lawlzer/utils
 - `sleep(ms)` - Async delay
@@ -16,14 +46,63 @@ alwaysApply: false
 - Type guards - isString, isNumber, isObject
 - Validators - email, URL, phone
 
+### Examples:
+```typescript
+import { sleep, isString, pick, validateEmail } from '@lawlzer/utils';
+
+// ✅ GOOD - Using existing utilities
+await sleep(1000); // Wait 1 second
+
+// ❌ BAD - Reimplementing existing utilities
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+await delay(1000);
+
+const userProfile = {
+  name: user.name,
+  email: user.email,
+  avatar: user.avatar
+};
+```
+
 ## Console Logging
 - `console.log` - Temporary debugging
 - `console.info` - General information
 - `console.debug` - Edge cases or unusual situations
 
+### Examples:
+```typescript
+// ✅ GOOD - Appropriate logging levels
+console.info('Server started on port 3000');
+console.debug('Unusual case: User has 0 items but checkout initiated');
+console.log('tempUserId:', userId); // Remove before committing
+
+// ❌ BAD - Misused logging levels
+console.log('Server started on port 3000'); // Should be info
+console.info('tempUserId:', userId); // Should be log, and removed when the issue has been solved.
+```
+
 ## Best Practices
 - Match existing code style
 - Inline single-use logic
+
+### Examples:
+```typescript
+// ✅ GOOD - Inline single-use logic
+const activeUsers = users.filter(user => user.lastLogin > thirtyDaysAgo);
+
+// ❌ BAD - Unnecessary function for single use
+const isActiveUser = (user: User) => user.lastLogin > thirtyDaysAgo;
+const activeUsers = users.filter(isActiveUser);
+
+// ✅ GOOD - Match existing style (if codebase uses arrow functions)
+const calculateTotal = (items: Item[]) => 
+  items.reduce((sum, item) => sum + item.price, 0);
+
+// ❌ BAD - Inconsistent with codebase style
+function calculateTotal(items: Item[]): number {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}
+```
 
 
 

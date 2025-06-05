@@ -3,85 +3,155 @@ description:
 globs: 
 alwaysApply: true
 ---
-# AI Workflow Management Rules
+# AI Workflow Management
 
-## Plan File System
+## Plan Location
+- Current workflow: `./plans/current.md`
+- Archive completed: `./plans/archive/[YYYY-MM-DD]-[project-name].md`
 
-### Location
-- Maintain current workflow at `./plans/current.md`
-- Create `./plans/` directory if it doesn't exist
-
-### Plan Structure Template
+## Plan Template
 
 ```markdown
 # [Task/Project Title]
 
 ## 🎯 Overview
-[Brief description of what we're building/implementing]
+[Brief description]
 
-### Key Context
-- **Purpose**: [Why this is needed]
-- **Current State**: [What exists now]
-- **Goal**: [What we want to achieve]
+**Purpose**: [Why needed]
+**Current**: [What exists]
+**Goal**: [Target state]
 
-## 📊 Current Status
+## 📊 Status
 
-| Component/Task | Status | Priority | Notes |
-|----------------|--------|----------|-------|
-| [Task 1] | 🟢 Complete | P0 | [Notes] |
-| [Task 2] | 🟡 In Progress | P1 | [Notes] |
-| [Task 3] | 🔴 Not Started | P2 | [Notes] |
+| Task | Status | Priority | Notes |
+|------|--------|----------|-------|
+| [Task] | 🟢/🟡/🔴/🔵 | P0/P1/P2 | [Notes] |
 
-## 📋 Implementation Phases
+## 📋 Implementation
 
 ### Phase 1: [Name] [Status]
-**Goal**: [What this phase accomplishes]
+**Goal**: [What this accomplishes]
 
 - [ ] Task 1
-- [ ] Task 2
-- [x] Task 3 (completed)
+- [x] Task 2 (completed)
 
-### Phase 2: [Name] [Status]
-**Goal**: [What this phase accomplishes]
+## 📝 Notes
+[Important decisions and technical details]
 
-- [ ] Task 1
-- [ ] Task 2
-
-## 📝 Notes and Decisions
-[Document important decisions and technical details]
-
-## 📊 Progress Tracking
-**Last Updated**: [YYYY-MM-DD HH:MM]
-**Current Phase**: [Phase name]
-**Next Task**: [What to do next]
+## 📊 Progress
+**Phase**: [Current phase]
+**Next**: [Next task]
 **Blockers**: [Any blockers]
 
-## ✅ Completed Tasks
-### [Date] - [What was completed]
-- Details of work done
+## ✅ Completed
+[What was done]
+- Details
 ```
 
-## Update Rules
+## Real-World Example
 
-### When to Update
-- **Immediately after** completing any task
-- **When starting** a new phase
-- **When encountering** blockers
-- **When making** important technical decisions
+```markdown
+# E-commerce Cart Feature
 
-### How to Update
-1. Check completed tasks: `- [x]`
-2. Update status emojis in table
-3. Update "Last Updated" timestamp
-4. Move completed phases to "Completed Tasks"
-5. Update "Next Task" to guide continuation
+## 🎯 Overview
+Implementing shopping cart functionality for the online store
 
-## Status Indicators
-- 🟢 Complete - Task fully implemented
-- 🟡 In Progress - Currently working on
-- 🔴 Not Started - Not begun
-- 🔵 Blocked - Cannot proceed
+**Purpose**: Allow users to add/remove items and checkout
+**Current**: Product catalog exists, no cart functionality
+**Goal**: Full cart with persistent storage and checkout flow
 
-## Archive Protocol
-When project completes:
-1. Move `current.md` to `./plans/archive/[YYYY-MM-DD]-[project-name].md`
+## 📊 Status
+
+| Task | Status | Priority | Notes |
+|------|--------|----------|-------|
+| Cart state management | 🟢 Complete | P0 | Using Redux |
+| Add to cart UI | 🟢 Complete | P0 | Button on product cards |
+| Cart drawer component | 🟡 In Progress | P0 | 70% done, styling left |
+| Persist cart to localStorage | 🔴 Not Started | P1 | For guest users |
+| Cart API endpoints | 🔴 Not Started | P1 | For logged-in users |
+| Checkout flow | 🔵 Blocked | P0 | Waiting for payment gateway credentials |
+
+## 📋 Implementation
+
+### Phase 1: Basic Cart UI 🟡 In Progress
+**Goal**: Users can add items and view cart
+
+- [x] Setup Redux store for cart
+- [x] Create addToCart action
+- [x] Add to cart buttons on products
+- [ ] Cart drawer with item list
+- [ ] Update quantities in cart
+- [ ] Remove items from cart
+
+### Phase 2: Cart Persistence 🔴 Not Started
+**Goal**: Cart survives page refresh
+
+- [ ] Save cart to localStorage on changes
+- [ ] Load cart from localStorage on app init
+- [ ] Sync cart with backend for logged-in users
+- [ ] Handle cart merging on login
+
+## 📝 Notes
+- Decided to use Redux over Context API for better devtools support
+- Cart drawer slides from right, 400px wide on desktop
+- Max quantity per item: 10
+- Free shipping threshold: $50
+
+## 📊 Progress
+**Phase**: Phase 1 - Basic Cart UI
+**Next**: Complete cart drawer styling
+**Blockers**: Payment gateway credentials needed for checkout
+
+## ✅ Completed
+### 2024-01-19 - Cart State Setup
+- Implemented Redux store with cart slice
+- Added actions: addToCart, updateQuantity, removeFromCart
+- Connected product cards to dispatch addToCart
+
+### 2024-01-20 - Add to Cart UI
+- Created AddToCartButton component with loading state
+- Added success toast notification
+- Implemented quantity selector for variable products
+```
+
+## Update Protocol
+
+### When
+- After completing tasks
+- Starting new phases
+- Encountering blockers
+- Making key decisions
+
+### How
+1. Check completed: `- [x]`
+2. Update status emojis
+3. Document completed work
+
+### Example Update Flow
+```markdown
+# Before: Starting a task
+| Cart drawer component | 🔴 Not Started | P0 | UI component |
+- [ ] Cart drawer with item list
+
+# After: Task completed
+| Cart drawer component | 🟢 Complete | P0 | Slide-out drawer done |
+- [x] Cart drawer with item list
+
+## ✅ Completed
+### 2024-01-20 - Cart Drawer Implementation
+- Created CartDrawer component with animations
+- Added item list with images and prices
+- Implemented slide-out animation from right
+```
+
+## Status Legend
+- 🟢 Complete
+- 🟡 In Progress
+- 🔴 Not Started
+- 🔵 Blocked
+
+## Archive Example
+```bash
+# When project is complete:
+mv ./plans/current.md ./plans/archive/2024-01-25-ecommerce-cart.md
+```

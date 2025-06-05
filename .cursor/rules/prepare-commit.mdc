@@ -1,0 +1,78 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Prepare Commit Guidelines
+
+## Pre-Commit Preparation Process
+
+### Command Execution Protocol
+- Execute each command in the specified order
+- Fix all errors before proceeding to the next command
+- Run each command again after fixing errors to verify the fix
+- Continue until all commands pass without errors
+
+### Required Commands Sequence
+
+0. **Testing**
+	```bash
+	npm run test
+	```
+	- Fix all test errors and warnings
+	- Re-run after modifying any code, to verify functionality.
+	- Implement tests for any newly written code, as necessary.
+	- If this is a repo that does not have any tests, do not implement tests.
+
+1. **Lint Check**
+   ```bash
+   npm run lint:eslint:commit
+   ```
+   - Fix all ESLint errors and warnings
+   - Re-run to confirm all issues are resolved
+
+2. **Build Verification**
+   ```bash
+   npm run build
+   ```
+   - Resolve all TypeScript compilation errors
+   - Fix any build configuration issues
+   - Re-run to ensure successful build
+
+3. 
+### Error Resolution Strategy
+
+
+#### For Build Errors
+- Address TypeScript type errors first
+- Fix import/export issues
+- Resolve any missing dependencies
+- Check for circular dependencies
+
+### Verification Steps
+- After fixing errors in a command, always run it again
+- Only proceed to the next command when current command passes
+- Run all commands one final time after all fixes to ensure stability
+
+### Example Workflow
+
+```bash
+# Step 1: Run lint
+npm run lint:eslint:commit
+# If errors found, fix them, then run again
+
+# Step 2: Once lint passes, run build
+npm run build
+# If errors found, fix them, then run again
+
+# Step 3: Final verification - run both commands
+npm run lint:eslint:commit
+npm run build
+# Both should pass without errors
+```
+
+### Success Criteria
+- All commands execute without errors
+- No warnings that block the commit
+- Build output is clean and successful
+- Ready for commit after all checks pass

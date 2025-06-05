@@ -10,3 +10,51 @@ alwaysApply: false
 - Frame instructions as what to do, not what to avoid
 - Be direct and action-oriented
 - Keep rules concise and clear
+
+### Examples:
+
+```markdown
+# ✅ GOOD - Positive, action-oriented directives
+
+## Error Handling
+- Let errors crash naturally to surface issues immediately
+- Throw descriptive errors when validation fails
+- Log errors before re-throwing for debugging
+
+## Code Organization
+- Group related functions together in modules
+- Export only necessary public interfaces
+- Place utility functions in dedicated utils directory
+
+# ❌ BAD - Negative framing and prohibitions
+
+## Error Handling
+- Don't use try/catch blocks
+- Avoid swallowing errors
+- Never return null on error
+
+## Code Organization
+- Don't scatter related functions
+- Avoid exposing internal functions
+- Don't put utilities in random places
+```
+
+### Rule Structure Example:
+
+```markdown
+# ✅ GOOD - Well-structured rule
+
+## Database Operations
+- Use transactions for multi-table updates
+- Apply row-level locking for concurrent access
+- Return affected row count from mutations
+
+### Examples:
+[Include code examples showing the correct approach]
+
+# ❌ BAD - Poorly structured rule
+
+## Database
+Don't forget about transactions. Avoid race conditions. 
+Make sure to handle database stuff properly.
+```

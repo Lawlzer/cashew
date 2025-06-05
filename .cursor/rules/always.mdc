@@ -11,11 +11,31 @@ alwaysApply: true
 - Create new functions only after confirming they don't exist
 
 ## Temporary Files
-- Use `./temp/ai/` for all temporary/testing files
+- Use `./temp/ai/` for all temporary/testing files that the AI will use, but NOT the code.
 - Create subdirectories as needed
+
+## Task Execution
+- Continue working until all tasks are complete without asking for permission
+- Make decisions and proceed with implementation automatically
+- Only pause when genuinely missing critical information that cannot be inferred
+- Assume implicit approval to continue with logical next steps
 
 ## Communication
 - Provide suggestions even if unrelated to current task
 - Ask clarifying questions when information is missing
 - Prioritize clean, self-documenting code
+
+### Examples:
+```typescript
+// ✅ GOOD - Asking for clarification
+// Note: The specification mentions "process users" but doesn't specify:
+// - Should we process all users or only active ones?
+// - What happens if a user processing fails?
+// - Is there a batch size limit?
+
+// ✅ GOOD - Providing unrelated suggestions
+// Implemented the user search as requested.
+// Note: I noticed the database queries could benefit from indexing on 'email' field
+// for better performance, especially as the user base grows.
+```
 
