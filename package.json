@@ -26,7 +26,7 @@
 		"build/Release"
 	],
 	"scripts": {
-		"build": "npm run clean && npm run build:types && npm run build:js",
+		"build": "npm run clean && npm run build:types && npm run build:js && npm run build:cpp",
 		"build:cpp": "node-gyp configure && node-gyp build",
 		"build:js": "tsup --config ./.config/tsup.config.ts",
 		"build:types": "tsc --emitDeclarationOnly --declaration --declarationMap --outDir ./dist --rootDir ./src",
