@@ -9,6 +9,11 @@ alwaysApply: true
 - Current workflow: `./plans/current.md`
 - Archive completed: `./plans/archive/[YYYY-MM-DD]-[project-name].md`
 
+## Linting Requirements
+- Always run `npm run lint:eslint:commit` after completing tasks
+- Fix any linting errors before marking tasks as complete
+- Include "linted" in task notes when linting has been verified
+
 ## Plan Template
 
 ```markdown
@@ -21,11 +26,38 @@ alwaysApply: true
 **Current**: [What exists]
 **Goal**: [Target state]
 
+## 💬 User Context & Intent
+<!-- Capture what the user is really asking for -->
+### Latest Request
+**What they said**: "[User's exact words]"
+**What they mean**: 
+- [Your interpretation of their real needs]
+- [Unstated requirements you've identified]
+- [Potential edge cases they haven't considered]
+
+## ⛔ Critical Rules
+<!-- Dynamically capture NEVER/ALWAYS/MUST rules from user -->
+### NEVER:
+- [Things user said to never do]
+
+### ALWAYS:
+- [Things user said to always do]
+
+### MUST:
+- [Critical requirements emphasized by user]
+
 ## 📊 Status
 
 | Task | Status | Priority | Notes |
 |------|--------|----------|-------|
 | [Task] | 🟢/🟡/🔴/🔵 | P0/P1/P2 | [Notes] |
+
+## 🏗️ Architecture
+<!-- Add Mermaid diagrams for complex flows -->
+```mermaid
+graph TD
+    A[Component] --> B[Component]
+```
 
 ## 📋 Implementation
 
@@ -35,8 +67,13 @@ alwaysApply: true
 - [ ] Task 1
 - [x] Task 2 (completed)
 
-## 📝 Notes
-[Important decisions and technical details]
+## 📝 Learning Log
+<!-- Brief entries capturing attempts and insights -->
+### [Date] - [What was attempted]
+**Tried**: [Approach taken]
+**Result**: [What happened]
+**Learning**: [Key insight gained]
+**Applied**: [How this changed your approach]
 
 ## 📊 Progress
 **Phase**: [Current phase]
@@ -60,16 +97,51 @@ Implementing shopping cart functionality for the online store
 **Current**: Product catalog exists, no cart functionality
 **Goal**: Full cart with persistent storage and checkout flow
 
+## 💬 User Context & Intent
+### Latest Request
+**What they said**: "Add a shopping cart to the site"
+**What they mean**: 
+- Need persistent cart that survives page refresh
+- Should integrate with existing product catalog
+- Likely expects standard e-commerce patterns (quantity updates, remove items)
+- Will need checkout flow integration later
+- Performance matters - cart updates should feel instant
+
+## ⛔ Critical Rules
+### NEVER:
+- Lose cart data on page refresh
+- Allow negative quantities
+- Show stale prices
+
+### ALWAYS:
+- Validate inventory before checkout
+- Show loading states during updates
+- Keep cart in sync across tabs
+
+### MUST:
+- Support guest checkout
+- Handle concurrent updates gracefully
+
 ## 📊 Status
 
 | Task | Status | Priority | Notes |
 |------|--------|----------|-------|
-| Cart state management | 🟢 Complete | P0 | Using Redux |
+| Cart state management | 🟢 Complete | P0 | Using Redux, linted |
 | Add to cart UI | 🟢 Complete | P0 | Button on product cards |
 | Cart drawer component | 🟡 In Progress | P0 | 70% done, styling left |
 | Persist cart to localStorage | 🔴 Not Started | P1 | For guest users |
 | Cart API endpoints | 🔴 Not Started | P1 | For logged-in users |
 | Checkout flow | 🔵 Blocked | P0 | Waiting for payment gateway credentials |
+
+## 🏗️ Architecture
+```mermaid
+graph LR
+    UI[Product UI] --> RS[Redux Store]
+    RS --> LS[LocalStorage]
+    RS --> API[Cart API]
+    API --> DB[(Database)]
+    RS --> CD[Cart Drawer]
+```
 
 ## 📋 Implementation
 
@@ -91,11 +163,18 @@ Implementing shopping cart functionality for the online store
 - [ ] Sync cart with backend for logged-in users
 - [ ] Handle cart merging on login
 
-## 📝 Notes
-- Decided to use Redux over Context API for better devtools support
-- Cart drawer slides from right, 400px wide on desktop
-- Max quantity per item: 10
-- Free shipping threshold: $50
+## 📝 Learning Log
+### 2024-01-19 - Redux vs Context API
+**Tried**: Context API for cart state
+**Result**: Re-renders were causing performance issues
+**Learning**: Redux with proper selectors prevents unnecessary re-renders
+**Applied**: Migrated to Redux Toolkit for better performance
+
+### 2024-01-20 - Cart Persistence Timing
+**Tried**: Save to localStorage on every update
+**Result**: Too many writes, caused lag
+**Learning**: Debounce localStorage writes by 500ms
+**Applied**: Added debounced persistence layer
 
 ## 📊 Progress
 **Phase**: Phase 1 - Basic Cart UI
@@ -107,25 +186,38 @@ Implementing shopping cart functionality for the online store
 - Implemented Redux store with cart slice
 - Added actions: addToCart, updateQuantity, removeFromCart
 - Connected product cards to dispatch addToCart
+- All linting errors resolved
 
 ### 2024-01-20 - Add to Cart UI
 - Created AddToCartButton component with loading state
 - Added success toast notification
 - Implemented quantity selector for variable products
+- Passed all linting checks
 ```
 
 ## Update Protocol
 
 ### When
 - After completing tasks
+- When user emphasizes rules (NEVER/ALWAYS/MUST)
 - Starting new phases
 - Encountering blockers
 - Making key decisions
+- Learning something important
+- After linting passes
 
 ### How
 1. Check completed: `- [x]`
 2. Update status emojis
-3. Document completed work
+3. Capture any new critical rules from user
+4. Log learnings if approach changed
+5. Run `npm run lint:eslint:commit`
+6. Fix any linting errors
+7. Analyze commit style: `git log --format="%s" -20 | sort -u`
+8. Prepare commit message matching repository style
+9. Show proposed commit message in chat
+10. Document completed work
+11. Add architecture diagrams for complex components
 
 ### Example Update Flow
 ```markdown
@@ -133,19 +225,31 @@ Implementing shopping cart functionality for the online store
 | Cart drawer component | 🔴 Not Started | P0 | UI component |
 - [ ] Cart drawer with item list
 
-# After: Task completed
-| Cart drawer component | 🟢 Complete | P0 | Slide-out drawer done |
+# During: User gives critical feedback
+User: "NEVER modify the existing product components"
+→ Add to ⛔ Critical Rules section immediately
+
+# After: Task completed with learning
+| Cart drawer component | 🟢 Complete | P0 | Slide-out drawer done, linted |
 - [x] Cart drawer with item list
+
+## 📝 Learning Log
+### 2024-01-20 - Cart Drawer Animation
+**Tried**: CSS transitions
+**Result**: Janky on mobile
+**Learning**: Use transform3d for hardware acceleration
+**Applied**: Switched to transform3d, smooth now
 
 ## ✅ Completed
 ### 2024-01-20 - Cart Drawer Implementation
 - Created CartDrawer component with animations
 - Added item list with images and prices
 - Implemented slide-out animation from right
+- Fixed all linting errors
 ```
 
 ## Status Legend
-- 🟢 Complete
+- 🟢 Complete (tested & linted)
 - 🟡 In Progress
 - 🔴 Not Started
 - 🔵 Blocked

@@ -12,8 +12,37 @@ Always start by managing the workflow:
 3. **If missing**: Create using workflow.mdc template
 4. **Execute** the user's request
 5. **Update** the plan after each task completion
+6. **Lint** Run `npm run lint:eslint:commit` after completing tasks
+   - If errors exist, fix them before marking the task complete
+   - Update the plan only after linting passes
 
 Begin checking the plan file now.
+
+## Key Sections to Maintain
+
+### 💬 User Context & Intent
+- Always interpret what the user is REALLY asking for
+- Look beyond their words to understand their actual needs
+- Identify unstated requirements and edge cases
+- Update this section with each new user request
+
+### ⛔ Critical Rules  
+- Watch for emphatic language: NEVER, ALWAYS, MUST, CRITICAL
+- Immediately capture these as rules in the workflow
+- These are non-negotiable requirements
+- Check against these rules before any implementation
+
+### 📝 Learning Log
+- Document what you tried and what happened
+- Capture key insights that changed your approach
+- Brief entries - focus on actionable learnings
+- Update immediately when you learn something important
+
+### 🏗️ Architecture
+- Create Mermaid diagrams for complex flows
+- Visualize data flow, component relationships, state machines
+- Add diagrams when they clarify understanding
+- Update diagrams as architecture evolves
 
 ## Examples:
 
@@ -34,6 +63,26 @@ Building a REST API for user CRUD operations
 **Current**: No existing API
 **Goal**: Full CRUD API with authentication
 
+## 💬 User Context & Intent
+### Latest Request
+**What they said**: "Create a REST API for user management"
+**What they mean**: 
+- Need standard CRUD operations (Create, Read, Update, Delete)
+- Likely expects RESTful conventions (GET /users, POST /users, etc.)
+- Will probably need authentication/authorization later
+- Should follow REST best practices (proper status codes, JSON responses)
+- May need pagination for user lists
+
+## ⛔ Critical Rules
+### NEVER:
+- [None specified yet]
+
+### ALWAYS:
+- [None specified yet]
+
+### MUST:
+- [None specified yet]
+
 ## 📊 Status
 
 | Task | Status | Priority | Notes |
@@ -43,44 +92,107 @@ Building a REST API for user CRUD operations
 | Add authentication | 🔴 Not Started | P1 | JWT implementation |
 | Add validation | 🔴 Not Started | P1 | Input validation |
 
+## 🏗️ Architecture
+```mermaid
+graph TD
+    Client[Client App] --> API[Express API]
+    API --> Auth[Auth Middleware]
+    API --> Routes[User Routes]
+    Routes --> DB[(PostgreSQL)]
+```
+
 3. Begin implementation...
-4. After creating server: Update status to 🟢 Complete
+4. Run `npm run lint:eslint:commit` to check for linting errors
+5. Fix any linting errors found
+6. After linting passes: Update status to 🟢 Complete
 ```
 
-### Example 2: Continuing Existing Work
+### Example 2: Capturing Critical Rules
 ```markdown
-User: "Add pagination to the user list endpoint"
+User: "Add pagination but NEVER break the existing API contracts"
 
 AI Actions:
-1. Check ./plans/current.md ✅ (exists)
-2. Read current progress:
-   - Express server ✅ Complete
-   - User routes ✅ Complete
-   - Authentication 🟡 In Progress
-3. Understand context from plan
-4. Implement pagination feature
-5. Update plan:
+1. Immediately update Critical Rules:
 
-## 📊 Status
-| Task | Status | Priority | Notes |
-|------|--------|----------|-------|
-| Setup Express server | 🟢 Complete | P0 | Done 2024-01-15 |
-| Create user routes | 🟢 Complete | P0 | Done 2024-01-15 |
-| Add pagination | 🟢 Complete | P1 | Added limit/offset |
-| Add authentication | 🟡 In Progress | P1 | JWT implementation |
+## ⛔ Critical Rules
+### NEVER:
+- Break existing API contracts
+
+2. Update User Context:
+
+## 💬 User Context & Intent
+### Latest Request
+**What they said**: "Add pagination but NEVER break the existing API contracts"
+**What they mean**: 
+- Need to add pagination while maintaining backwards compatibility
+- Existing clients should continue working without changes
+- Probably means adding optional query parameters
+- May need to version the API if breaking changes are needed
 ```
 
-### Example 3: Handling Blocked Tasks
+### Example 3: Learning from Failed Attempts
 ```markdown
-User: "Implement OAuth integration"
+After implementing offset pagination and discovering performance issues:
+
+## 📝 Learning Log
+### 2024-01-20 - Pagination Performance
+**Tried**: Offset-based pagination (LIMIT/OFFSET)
+**Result**: Queries became slow after 10k records
+**Learning**: Cursor-based pagination scales better for large datasets
+**Applied**: Switched to cursor pagination using IDs
+```
+
+### Example 4: Complex Feature with Architecture
+```markdown
+User: "Implement real-time notifications"
 
 AI Actions:
-1. Check ./plans/current.md
-2. Discover missing OAuth credentials needed
-3. Update plan with blocker:
+1. Create architecture diagram:
 
-| OAuth integration | 🔵 Blocked | P1 | Need client ID/secret |
-
-4. Inform user:
-"I've started the OAuth integration but need the OAuth client ID and secret to proceed. I've marked this as blocked in the workflow plan."
+## 🏗️ Architecture
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant WS as WebSocket Server
+    participant API as REST API
+    participant Q as Message Queue
+    participant DB as Database
+    
+    C->>WS: Connect WebSocket
+    API->>DB: Create Notification
+    API->>Q: Publish Event
+    Q->>WS: Consume Event
+    WS->>C: Push Notification
 ```
+
+2. Update plan with architectural decisions documented
+```
+
+### Example 5: Continuous Learning
+```markdown
+User: "Add error handling middleware"
+
+AI Actions:
+1. Implement error handling
+2. Run `npm run lint:eslint:commit`
+3. Encounter unexpected behavior
+4. Update Learning Log:
+
+## 📝 Learning Log
+### 2024-01-20 - Express Error Handler Order
+**Tried**: Added error handler at beginning of middleware stack
+**Result**: Never caught errors from routes
+**Learning**: Error handlers must be added AFTER all other middleware
+**Applied**: Moved error handler to end of middleware stack
+```
+
+## Best Practices
+
+1. **User Intent**: Don't just record what they say - interpret what they need
+2. **Critical Rules**: Capture immediately when user emphasizes something
+3. **Learning Log**: Brief but actionable - focus on what changed your approach
+4. **Architecture**: Visualize when it helps understanding or communication
+5. **Continuous Updates**: The workflow is a living document - keep it current
+
+Remember: The workflow captures not just WHAT you did, but WHY you did it and WHAT YOU LEARNED.
+

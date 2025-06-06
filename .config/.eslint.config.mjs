@@ -16,6 +16,7 @@ export default tseslint.config(
 		files: ['**/*.ts', '**/*.tsx'],
 		plugins: {
 			'@typescript-eslint': tseslint.plugin,
+
 			'unused-imports': unusedImports,
 			'simple-import-sort': simpleImportSort,
 		},
@@ -25,6 +26,7 @@ export default tseslint.config(
 				project: './tsconfig.eslint.json',
 			},
 		},
+
 		rules: {
 			// Misc
 			'@typescript-eslint/no-unused-vars': commit
@@ -286,7 +288,6 @@ export default tseslint.config(
 		rules: {
 			'@typescript-eslint/no-unsafe-call': ['off'],
 			'@typescript-eslint/no-confusing-void-expression': ['off'],
-			'react/jsx-no-bind': ['off'], // More flexibility in tests
 		},
 	},
 

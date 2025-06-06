@@ -1,0 +1,270 @@
+---
+description: 
+globs: *.tsx,*.ts,*.jsx,*.js
+alwaysApply: false
+---
+# React & Next.js Development Guidelines
+
+## Component Structure
+- Create functional components using arrow functions with explicit return types
+- Place component logic before the return statement
+- Use TypeScript interfaces for all props
+- Export components as named exports, not default exports
+
+### Examples:
+```typescript
+// ✅ GOOD - Clear structure with types
+interface ButtonProps {
+  onClick: () => void;
+  children: React.ReactNode;
+  variant?: 'primary' | 'secondary';
+}
+
+export const Button: React.FC<ButtonProps> = ({ onClick, children, variant = 'primary' }) => {
+  const handleClick = () => {
+    console.log('Button clicked');
+    onClick();
+  };
+
+  return (
+    <button 
+      className={`btn btn-${variant}`}
+      onClick={handleClick}
+    >
+      {children}
+    </button>
+  );
+};
+
+// ❌ BAD - Missing types, unclear structure
+export default function Button({ onClick, children, variant }) {
+  return <button onClick={() => { console.log('clicked'); onClick(); }}>{children}</button>
+}
+```
+
+## State Management
+- Use useState for component-local state
+- Extract complex state logic into custom hooks
+- Initialize state with proper types
+- Group related state updates together
+
+### Examples:
+```typescript
+// ✅ GOOD - Properly typed state with logical grouping
+interface UserFormState {
+  name: string;
+  email: string;
+  isSubmitting: boolean;
+}
+
+const UserForm: React.FC = () => {
+  const [formState, setFormState] = useState<UserFormState>({
+    name: '',
+    email: '',
+    isSubmitting: false
+  });
+
+  const updateForm = (updates: Partial<UserFormState>) => {
+    setFormState(prev => ({ ...prev, ...updates }));
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* form content */}
+    </form>
+  );
+};
+
+// ❌ BAD - Scattered state without types
+const UserForm = () => {
+  const [name, setName] = useState();
+  const [email, setEmail] = useState();
+  const [isSubmitting, setIsSubmitting] = useState();
+  // Multiple separate updates instead of grouped
+}
+```
+
+## React Hooks
+- Call hooks at the top level of components
+- Prefix custom hooks with "use"
+- Include all dependencies in useEffect/useCallback/useMemo
+- Clean up side effects in useEffect return
+
+### Examples:
+```typescript
+// ✅ GOOD - Proper hook usage with cleanup
+const useWindowSize = () => {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    handleResize(); // Set initial size
+    window.addEventListener('resize', handleResize);
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []); // Empty deps - only run once
+
+  return size;
+};
+
+// ❌ BAD - Missing cleanup, wrong dependencies
+const Component = () => {
+  const [data, setData] = useState();
+  
+  useEffect(() => {
+    fetch('/api/data').then(res => res.json()).then(setData);
+    // Missing cleanup for potential memory leak
+  }); // Missing dependency array - runs every render
+}
+```
+
+## Next.js Patterns
+- Use App Router conventions (app directory)
+- Implement proper loading and error boundaries
+- Mark client components with 'use client' directive
+- Fetch data in Server Components when possible
+
+### Examples:
+```typescript
+// ✅ GOOD - Server Component with proper data fetching
+// app/users/page.tsx
+async function UsersPage() {
+  const users = await fetch('https://api.example.com/users', {
+    next: { revalidate: 3600 } // Cache for 1 hour
+  }).then(res => res.json());
+
+  return (
+    <div>
+      <h1>Users</h1>
+      <UserList users={users} />
+    </div>
+  );
+}
+
+// ✅ GOOD - Client Component when needed
+// app/components/InteractiveChart.tsx
+'use client';
+
+import { useState } from 'react';
+
+export const InteractiveChart: React.FC<{ data: ChartData }> = ({ data }) => {
+  const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
+  // Interactive client-side logic
+};
+
+// ❌ BAD - Client component for static content
+'use client'; // Unnecessary - this could be a Server Component
+
+export const StaticHeader = () => {
+  return <h1>Welcome</h1>; // No interactivity needed
+};
+```
+
+## Performance Optimization
+- Memoize expensive computations with useMemo
+- Wrap callbacks in useCallback when passed as props
+- Use React.memo for components that re-render frequently
+- Implement virtual scrolling for long lists
+
+### Examples:
+```typescript
+// ✅ GOOD - Proper memoization
+const ExpensiveList: React.FC<{ items: Item[]; onItemClick: (id: string) => void }> = ({ items, onItemClick }) => {
+  const sortedItems = useMemo(
+    () => items.sort((a, b) => b.priority - a.priority),
+    [items]
+  );
+
+  const handleClick = useCallback(
+    (id: string) => {
+      console.log(`Clicked item ${id}`);
+      onItemClick(id);
+    },
+    [onItemClick]
+  );
+
+  return (
+    <ul>
+      {sortedItems.map(item => (
+        <MemoizedItem key={item.id} item={item} onClick={handleClick} />
+      ))}
+    </ul>
+  );
+};
+
+const MemoizedItem = React.memo<{ item: Item; onClick: (id: string) => void }>(
+  ({ item, onClick }) => (
+    <li onClick={() => onClick(item.id)}>{item.name}</li>
+  )
+);
+
+// ❌ BAD - Recreating functions/values every render
+const Component = ({ items, onItemClick }) => {
+  // Sorting on every render
+  const sortedItems = items.sort((a, b) => b.priority - a.priority);
+  
+  return items.map(item => (
+    // Creating new function on every render
+    <li onClick={() => onItemClick(item.id)}>{item.name}</li>
+  ));
+};
+```
+
+## Form Handling
+- Use controlled components for form inputs
+- Implement proper validation before submission
+- Show loading states during async operations
+- Handle errors gracefully with user feedback
+
+### Examples:
+```typescript
+// ✅ GOOD - Controlled form with validation
+const ContactForm: React.FC = () => {
+  const [formData, setFormData] = useState({ email: '', message: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.email.includes('@')) {
+      newErrors.email = 'Please enter a valid email';
+    }
+    if (formData.message.length < 10) {
+      newErrors.message = 'Message must be at least 10 characters';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validate()) return;
+    
+    setIsSubmitting(true);
+    await submitForm(formData);
+    setIsSubmitting(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="email"
+        value={formData.email}
+        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+        disabled={isSubmitting}
+      />
+      {errors.email && <span className="error">{errors.email}</span>}
+      
+      <button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? 'Submitting...' : 'Submit'}
+      </button>
+    </form>
+  );
+};
+```

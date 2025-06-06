@@ -39,7 +39,34 @@ alwaysApply: false
    - Fix any build configuration issues
    - Re-run to ensure successful build
 
-3. 
+3. 7. **Prepare Commit** Analyze repository commit style and prepare message
+- Run `git log --format="%s" -20 | sort -u` to understand commit patterns
+- Prepare a commit message matching the repository's style
+- Show the proposed commit message in chat for review
+
+
+
+- Some commits use conventional commits (feat:, fix:, refactor:)
+- Others use simple present tense descriptions
+- Mix of styles suggests flexibility
+
+3. Prepare commit message for review:
+"Based on the repository's commit history, I suggest the following commit message:
+
+**Proposed commit:** `feat: add workflow git commit preparation guidelines`
+
+This follows the conventional commit format seen in recent commits and clearly describes the changes made to the workflow documentation."
+
+4. Update completed section with commit info:
+## ✅ Completed
+### 2024-01-20 - Workflow Git Integration
+- Added git commit preparation section to workflow.mdc
+- Updated perform-workflow.mdc with commit style analysis step
+- Added example showing commit message preparation
+- Proposed commit: `feat: add workflow git commit preparation guidelines`
+```
+
+
 ### Error Resolution Strategy
 
 

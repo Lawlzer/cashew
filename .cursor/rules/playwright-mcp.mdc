@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+There should be an MCP server running that allows you to visit the website, click buttons, and do anything else necessary.
+If there are any issues, tell the user to run "npx -y playwright-mcp".
