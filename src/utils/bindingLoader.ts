@@ -1,5 +1,4 @@
 import { throwError } from '@lawlzer/utils';
-import { createRequire } from 'module';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import * as v from 'valibot';
@@ -19,11 +18,24 @@ function getDirInfo(): string {
 		if (typeof Bun !== 'undefined' && typeof require !== 'undefined') {
 			try {
 				// Try to resolve our own package
-
 				const resolved = require.resolve('@lawlzer/cashew/package.json');
 				return path.dirname(resolved);
 			} catch {
-				// Package might not be installed as a dependency
+				// Try alternative resolution methods for Bun
+				try {
+					// Try to find the module in node_modules
+					const Module = dynamicRequire('module');
+					const paths = Module._nodeModulePaths?.(process.cwd()) || [];
+					for (const modulePath of paths) {
+						const packagePath = path.join(modulePath, '@lawlzer', 'cashew');
+						const fs = dynamicRequire('fs');
+						if (fs.existsSync(path.join(packagePath, 'package.json'))) {
+							return packagePath;
+						}
+					}
+				} catch {
+					// Continue to next strategy
+				}
 			}
 		}
 
@@ -48,13 +60,34 @@ function getDirInfo(): string {
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval
 		const getImportMeta = new Function('return import.meta;');
 		const importMeta = getImportMeta();
-		if (importMeta?.resolve) {
-			try {
-				const resolved = importMeta.resolve('@lawlzer/cashew/package.json');
-				const resolvedPath = resolved.startsWith('file://') ? fileURLToPath(resolved) : resolved;
-				return path.dirname(resolvedPath);
-			} catch {
-				// Fall through
+		if (importMeta) {
+			if (typeof importMeta.resolve === 'function') {
+				try {
+					const resolved = importMeta.resolve('@lawlzer/cashew/package.json');
+					const resolvedPath = resolved.startsWith('file://') ? fileURLToPath(resolved) : resolved;
+					return path.dirname(resolvedPath);
+				} catch {
+					// Fall through to url fallback
+				}
+			}
+			if (typeof importMeta.url === 'string' && importMeta.url.length > 0) {
+				// Try using import.meta.url as a fallback
+				try {
+					const currentFileUrl = importMeta.url;
+					const currentDir = path.dirname(fileURLToPath(currentFileUrl));
+					// Look for the package root from the current file location
+					let searchDir = currentDir;
+					for (let i = 0; i < 10; i++) {
+						if (searchDir.endsWith('cashew')) {
+							return searchDir;
+						}
+						const parentDir = path.dirname(searchDir);
+						if (parentDir === searchDir) break; // Reached root
+						searchDir = parentDir;
+					}
+				} catch {
+					// Fall through
+				}
 			}
 		}
 	} catch {
@@ -129,9 +162,8 @@ function getDirInfo(): string {
 		for (const candidate of candidates) {
 			// Check if this looks like the right directory by checking for expected structure
 			try {
-				// Check if we're in Bun and can use fs directly
-
-				const fs = typeof Bun !== 'undefined' && typeof require !== 'undefined' ? dynamicRequire('fs') : dynamicRequire('fs');
+				// Try to load fs module
+				const fs = dynamicRequire('fs');
 
 				// Check if build/Release exists (where .node files are)
 				const releaseDir = path.join(candidate, '..', 'build', 'Release');
@@ -164,9 +196,34 @@ function getDirInfo(): string {
 
 // Create require function for both ESM and CJS
 function createRequireFunction(): NodeRequire {
-	// Check if we're in Bun and require is available
-	if (typeof Bun !== 'undefined' && typeof require !== 'undefined') {
-		return require;
+	// Check if we're in Bun - use special handling
+
+	if (typeof Bun !== 'undefined') {
+		// If require is available in Bun, use it
+		if (typeof require !== 'undefined') {
+			return require;
+		}
+
+		// For Bun without require, create a special loader
+		const bunLoader = ((id: string) => {
+			if (id.endsWith('.node')) {
+				// Use process.dlopen directly for native modules in Bun
+				const mod = { exports: {} };
+				try {
+					process.dlopen(mod, id);
+					return mod.exports;
+				} catch (err) {
+					throw new Error(`Failed to load native module ${id} in Bun: ${String(err)}`);
+				}
+			}
+			throw new Error(`Cannot require ${id} in Bun without require`);
+		}) as any;
+
+		bunLoader.resolve = (id: string) =>
+			// Simple resolution for Bun
+			id;
+
+		return bunLoader as NodeRequire;
 	}
 
 	// Try to get require function
@@ -181,19 +238,8 @@ function createRequireFunction(): NodeRequire {
 		// Fall through
 	}
 
-	// Try to create require from import.meta.url
-	try {
-		// eslint-disable-next-line @typescript-eslint/no-implied-eval
-		const getMetaUrl = new Function('return import.meta?.url;');
-		const url = getMetaUrl() as string | undefined;
-		if (url !== undefined && url !== null && url.length > 0) {
-			return createRequire(url);
-		}
-	} catch {
-		// Fall through
-	}
-
 	// For Bun, try to use Bun.require if available
+
 	if (typeof Bun !== 'undefined' && (Bun as any).require) {
 		return (Bun as any).require as NodeRequire;
 	}
@@ -202,6 +248,16 @@ function createRequireFunction(): NodeRequire {
 	// This ensures we fail gracefully when require is not available
 	const mockRequire = ((id: string) => {
 		if (id.endsWith('.node')) {
+			// Try to use process.dlopen as a last resort
+			if (process.dlopen !== undefined) {
+				const mod = { exports: {} };
+				try {
+					process.dlopen(mod, id);
+					return mod.exports;
+				} catch (err) {
+					throw new Error(`Cannot load native module ${id} - dlopen failed: ${String(err)}`);
+				}
+			}
 			throw new Error(`Cannot load native module ${id} - require not available in this environment`);
 		}
 		throw new Error(`Cannot require ${id} - require not available in this environment`);
@@ -218,8 +274,46 @@ const requireFunction = createRequireFunction();
 
 // Load native binding with multiple path attempts
 function loadNativeBinding(name: string): unknown {
-	const packageRoot = getDirInfo();
 	const bindingName = `${name}.node`;
+
+	// Special handling for Bun
+
+	if (typeof Bun !== 'undefined') {
+		try {
+			// Try using Bun's native require if available
+			if (typeof require === 'function') {
+				// Try common paths for Bun
+				const bunPaths = [path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName), path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName)];
+
+				// Try direct loading with require
+				for (const p of bunPaths) {
+					try {
+						return dynamicRequire(p);
+					} catch {
+						// Try next path
+					}
+				}
+
+				// Try using process.dlopen for Bun
+				try {
+					const fs = dynamicRequire('fs');
+					for (const p of bunPaths) {
+						if (fs.existsSync(p)) {
+							const mod = { exports: {} };
+							process.dlopen(mod, p);
+							return mod.exports;
+						}
+					}
+				} catch {
+					// Continue to regular loading
+				}
+			}
+		} catch {
+			// Fall through to regular loading
+		}
+	}
+
+	const packageRoot = getDirInfo();
 
 	// Build comprehensive list of paths to try
 	const paths = [
@@ -230,6 +324,7 @@ function loadNativeBinding(name: string): unknown {
 		// Paths relative to package root
 		path.join(packageRoot, 'build', 'Release', bindingName),
 		path.join(packageRoot, 'build', 'Debug', bindingName),
+		path.join(packageRoot, 'dist', 'build', 'Release', bindingName),
 
 		// Paths relative to current directory (for when running from source)
 		path.join(process.cwd(), 'build', 'Release', bindingName),
@@ -237,8 +332,11 @@ function loadNativeBinding(name: string): unknown {
 
 		// For when the package is installed as a dependency
 		path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+		path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName),
 		path.join(process.cwd(), '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+		path.join(process.cwd(), '..', 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName),
 		path.join(process.cwd(), '..', '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+		path.join(process.cwd(), '..', '..', 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName),
 
 		// Legacy paths for compatibility
 		path.join(packageRoot, '..', 'build', 'Release', bindingName),
@@ -246,17 +344,56 @@ function loadNativeBinding(name: string): unknown {
 	];
 
 	// Add Bun-specific paths
+
 	if (typeof Bun !== 'undefined') {
 		// Bun might resolve modules differently, add more potential paths
 		const scriptDir = path.dirname(process.argv[1] || process.cwd());
 		paths.push(
 			// Try relative to the script location
 			path.join(scriptDir, 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+			path.join(scriptDir, 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName),
 			path.join(scriptDir, '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
-			// Windows specific paths
-			path.join('A:', 'misc', 'cashew', 'build', 'Release', bindingName),
-			path.join('C:', 'misc', 'cashew', 'build', 'Release', bindingName)
+			path.join(scriptDir, '..', 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName)
 		);
+
+		// Add paths for when running from a bundled dist file
+		// Look for node_modules in parent directories
+		let currentDir = process.cwd();
+		for (let i = 0; i < 5; i++) {
+			paths.push(path.join(currentDir, 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName), path.join(currentDir, 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName));
+			currentDir = path.dirname(currentDir);
+		}
+	}
+
+	// Additional paths for edge cases
+	// Try to resolve the module location directly
+	try {
+		// eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+		if (typeof require !== 'undefined' && require.resolve) {
+			try {
+				// Try to resolve the package first
+				const packagePath = require.resolve('@lawlzer/cashew/package.json');
+				const packageDir = path.dirname(packagePath);
+				paths.push(path.join(packageDir, 'build', 'Release', bindingName), path.join(packageDir, 'dist', 'build', 'Release', bindingName));
+			} catch {
+				// Try to resolve the binding directly
+				try {
+					const resolvedPath = require.resolve(`@lawlzer/cashew/build/Release/${bindingName}`);
+					paths.push(resolvedPath);
+				} catch {
+					// Continue with other paths
+				}
+			}
+		}
+	} catch {
+		// Continue with other strategies
+	}
+
+	// For linked packages, also check the actual cashew directory
+	// When running from dist/index.js, we need to go up to find build/Release
+	if (packageRoot.includes('dist')) {
+		const actualPackageRoot = path.dirname(packageRoot);
+		paths.push(path.join(actualPackageRoot, 'build', 'Release', bindingName), path.join(actualPackageRoot, 'dist', 'build', 'Release', bindingName));
 	}
 
 	// Remove duplicates while preserving order
@@ -265,9 +402,8 @@ function loadNativeBinding(name: string): unknown {
 	// Try to find which paths actually exist (for better error reporting)
 	const existingPaths: string[] = [];
 	try {
-		// Check if we're in Bun and can use fs directly
-
-		const fs = typeof Bun !== 'undefined' && typeof require !== 'undefined' ? dynamicRequire('fs') : dynamicRequire('fs');
+		// Try to load fs module for existence checking
+		const fs = dynamicRequire('fs');
 		for (const p of uniquePaths) {
 			try {
 				if (fs.existsSync(p)) {
@@ -279,6 +415,20 @@ function loadNativeBinding(name: string): unknown {
 		}
 	} catch {
 		// fs not available, skip existence check
+	}
+
+	// Special handling for Bun - try dlopen first
+
+	if (typeof Bun !== 'undefined' && existingPaths.length > 0) {
+		for (const bindingPath of existingPaths) {
+			try {
+				const mod = { exports: {} };
+				process.dlopen(mod, bindingPath);
+				return mod.exports;
+			} catch {
+				// Try next path
+			}
+		}
 	}
 
 	// Try to load from existing paths first
@@ -319,6 +469,7 @@ export const keyboardSchema = v.object({
 	isKeyPressed: functionSchema,
 	type: functionSchema,
 	tapKey: functionSchema,
+	holdKeyForDuration: functionSchema,
 });
 
 export const mouseSchema = v.object({
@@ -327,6 +478,8 @@ export const mouseSchema = v.object({
 	getPosition: functionSchema,
 	hold: functionSchema,
 	release: functionSchema,
+	moveRelative: functionSchema,
+	moveRelativePolar: functionSchema,
 });
 
 export const miscSchema = v.object({
@@ -343,6 +496,10 @@ export const clipboardSchema = v.object({
 export const screenRawSchema = v.object({
 	setSquare: functionSchema,
 	clearSquare: functionSchema,
+});
+
+export const panicShutdownSchema = v.object({
+	enablePanicShutdown: functionSchema,
 });
 
 // Create a typed binding loader that validates at runtime
@@ -387,11 +544,12 @@ export interface ScreenBinding {
 }
 
 export interface KeyboardBinding {
-	holdKey: (keyCode: number, windowTitle: string) => Promise<void>;
-	releaseKey: (keyCode: number, windowTitle: string) => Promise<void>;
+	holdKey: (keyCode: number, windowTitle?: string) => Promise<void>;
+	releaseKey: (keyCode: number, windowTitle?: string) => Promise<void>;
 	isKeyPressed: (keyCode: number) => Promise<boolean>;
 	type: (keycodes: number[], windowTitle: string, delayPerKey: number) => Promise<boolean>;
-	tapKey: (keyCode: number, windowTitle: string) => Promise<void>;
+	tapKey: (keyCode: number, windowTitle?: string) => Promise<void>;
+	holdKeyForDuration: (keyCode: number, duration: number) => Promise<void>;
 }
 
 export interface MouseBinding {
@@ -400,6 +558,8 @@ export interface MouseBinding {
 	getPosition: () => Promise<{ x: number; y: number }>;
 	hold: (x: number | null, y: number | null, button: string) => Promise<void>;
 	release: (x: number | null, y: number | null, button: string) => Promise<void>;
+	moveRelative: (dx: number, dy: number, smoothDuration: number, useRawInput: boolean) => Promise<void>;
+	moveRelativePolar: (angle: number, distance: number, smoothDuration: number, useRawInput: boolean) => Promise<void>;
 }
 
 export interface MiscBinding {
@@ -416,4 +576,8 @@ export interface ClipboardBinding {
 export interface ScreenRawBinding {
 	setSquare: (x: number, y: number, width: number, height: number, r: number, g: number, b: number) => Promise<boolean>;
 	clearSquare: () => Promise<boolean>;
+}
+
+export interface PanicShutdownBinding {
+	enablePanicShutdown: (keyCode: number, keyName: string) => Promise<boolean>;
 }

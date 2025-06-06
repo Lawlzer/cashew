@@ -42,6 +42,58 @@ const mousePosition = await Mouse.getPosition();
 console.log(mousePosition); // { x: 100, y: 200 }
 ```
 
+#### Relative Mouse Movement (for FPS games and locked cursors)
+
+```typescript
+import { Mouse } from '@lawlzer/cashew';
+
+// Move mouse relative to current position
+await Mouse.moveRelative({
+	dx: 100, // Move 100 pixels right
+	dy: -50, // Move 50 pixels up
+	smoothDuration: 200, // Smooth movement over 200ms
+	useRawInput: true, // Use raw input for games (doesn't move actual cursor)
+});
+
+// Look in a specific direction using angle and distance
+await Mouse.lookAt({
+	angle: 90, // 90 degrees = up, 0 = right, 180 = left, 270 = down
+	distance: 100, // Move 100 pixels in that direction
+	smoothDuration: 150,
+	useRawInput: true, // Recommended for FPS games
+});
+
+// Camera helper methods for FPS games
+await Mouse.camera.lookUp(10, 5, true); // Look up 10 degrees (5 pixels per degree, smooth)
+await Mouse.camera.lookDown(5, 5, true); // Look down 5 degrees
+await Mouse.camera.turnLeft(45, 4, true); // Turn left 45 degrees
+await Mouse.camera.turnRight(90, 3, false); // Turn right 90 degrees (instant, no smoothing)
+
+// Simulating weapon recoil compensation
+const recoilPattern = [
+	{ dx: 0, dy: -5 }, // Initial upward kick
+	{ dx: 2, dy: -8 }, // More up with slight right
+	{ dx: -1, dy: -6 }, // Up with slight left
+];
+
+for (const movement of recoilPattern) {
+	await Mouse.moveRelative({
+		dx: movement.dx,
+		dy: movement.dy,
+		smoothDuration: 50,
+		useRawInput: true,
+	});
+	await sleep(100); // Delay between shots
+}
+```
+
+**Tips for game automation:**
+
+- Use `useRawInput: true` for FPS games where the cursor is locked/centered
+- Adjust `pixelsPerDegree` based on your game's sensitivity settings
+- Use smooth movements for natural-looking camera control
+- Use instant movements (`smoothDuration: 0` or `smooth: false`) for quick flicks/turns
+
 ### Screen/Image
 
 ```typescript
@@ -82,6 +134,48 @@ const text = await Ocr.recognize('path/to/image.png');
 console.log(text);
 // There is no (current) utility for reading an image from the clipboard or a variable. It MUST be written to a file.
 ```
+
+### Async vs Sync Operations
+
+This library now provides both synchronous and truly asynchronous versions of operations that involve delays or significant processing time. The async versions run on worker threads and don't block the Node.js event loop.
+
+#### When to use Async versions:
+
+- **Screen capture** of large areas
+- **Mouse clicks** with hold delays
+- **Keyboard typing** with delays between keys
+- Any operation where you need to maintain UI responsiveness or handle other events
+
+#### Available Async Methods:
+
+```typescript
+// Screen - Non-blocking screen capture
+const image = await Screen.initFromScreenAsync(0, 0, 1920, 1080);
+const pixel = await Screen.getSingleScreenPixelAsync(100, 200);
+
+// Mouse - Non-blocking clicks with delays
+await Mouse.clickAsync({ position: { x: 100, y: 200 }, holdFor: 500 });
+await Mouse.clickMessageAsync({ position: { x: 100, y: 200 }, windowTitle: 'App', type: 'post', holdFor: 300 });
+
+// Keyboard - Non-blocking typing with delays
+await Keyboard.typeAsync('Hello World', { delayPerKey: 50 });
+await Keyboard.holdKeyForAsync('shift', 1000); // Hold shift for 1 second
+```
+
+#### Performance Benefits:
+
+1. **Parallel Operations**: You can run multiple async operations simultaneously
+
+   ```typescript
+   // Run 5 screen captures in parallel
+   const images = await Promise.all([Screen.initFromScreenAsync(0, 0, 100, 100), Screen.initFromScreenAsync(100, 0, 100, 100), Screen.initFromScreenAsync(200, 0, 100, 100), Screen.initFromScreenAsync(300, 0, 100, 100), Screen.initFromScreenAsync(400, 0, 100, 100)]);
+   ```
+
+2. **Non-blocking Event Loop**: Your application remains responsive during long operations
+   ```typescript
+   // This won't block other timers, event handlers, etc.
+   await Keyboard.typeAsync('A very long text...', { delayPerKey: 100 });
+   ```
 
 ### MISC/Utilities
 

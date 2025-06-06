@@ -40,6 +40,13 @@
        {
            'target_name': 'screenRaw',
            'sources': [ 'src/cpp/screenRaw.cpp' ]
+       },
+
+
+
+       {
+           'target_name': 'panicShutdown',
+           'sources': [ 'src/cpp/panicShutdown.cpp' ]
        }
    ]
 }

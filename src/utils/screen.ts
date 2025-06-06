@@ -1,11 +1,43 @@
 import { ensureDirectoryExists, throwError } from '@lawlzer/utils';
-import sharp from 'sharp';
 
 import { loadBinding, type ScreenBinding, screenSchema } from './bindingLoader';
 import { Config } from './config';
 import { isCorrectColour, type Position } from './misc';
 
-// Load the binding with the new Valibot-based loader
+// Lazy load sharp to avoid issues with Bun
+const sharpModule: any = null;
+let sharpLoadingPromise: Promise<any> | null = null;
+
+async function getSharp(): Promise<any> {
+	if (sharpModule) {
+		return sharpModule;
+	}
+
+	// If already loading, wait for the existing load to complete
+	if (sharpLoadingPromise) {
+		return sharpLoadingPromise;
+	}
+
+	// Lazy load sharp to avoid bundling it for libraries that don't use screen features
+	// Also allows the lib to work even if sharp installation fails (for non-screen usage)
+	// Also significantly speeds up the import time
+	// eslint-disable-next-line @typescript-eslint/no-implied-eval
+	const dynamicImport = new Function('specifier', 'return import(specifier)');
+
+	sharpLoadingPromise = (async () => {
+		try {
+			const loadedModule = await dynamicImport('sharp');
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+			return loadedModule.default || loadedModule;
+		} catch (error) {
+			throwError(`Failed to load sharp module. Please install it with: npm install sharp\n${String(error)}`);
+		}
+	})();
+
+	return sharpLoadingPromise;
+}
+
+// Load the bindings with the new Valibot-based loader
 const screenBinding = loadBinding<ScreenBinding>('screen', screenSchema);
 
 export interface rgb {
@@ -66,6 +98,7 @@ export class Image {
 		const buffer = Buffer.from(output);
 
 		await ensureDirectoryExists(path);
+		const sharp = await getSharp();
 		await sharp(buffer, {
 			raw: {
 				width: this.width,
@@ -151,6 +184,7 @@ export class Screen {
 	}
 
 	public static async initFromFile(path: string): Promise<Image> {
+		const sharp = await getSharp();
 		const img = await sharp(path).raw().toBuffer({ resolveWithObject: true });
 
 		const imgData = img.data;

@@ -7,12 +7,18 @@
 #include <thread>
 #include <chrono>
 #include <string>
+#include <memory>
+#include <mutex>
+#include "common.h"
+
+using namespace cashew;
 
 // Global variables for the overlay window
-HWND overlayWindow = NULL;
-COLORREF currentColor = RGB(0, 0, 0);
-RECT currentRect = {0, 0, 0, 0};
-bool hasActiveSquare = false;
+static std::mutex overlayMutex;
+static HWND overlayWindow = NULL;
+static COLORREF currentColor = RGB(0, 0, 0);
+static RECT currentRect = {0, 0, 0, 0};
+static bool hasActiveSquare = false;
 
 // Window procedure for the overlay window
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -28,6 +34,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             FillRect(hdc, &windowRect, transparentBrush);
             DeleteObject(transparentBrush);
             
+            std::lock_guard<std::mutex> lock(overlayMutex);
             if (hasActiveSquare) {
                 // Create a brush with the desired color
                 HBRUSH brush = CreateSolidBrush(currentColor);
@@ -42,9 +49,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             EndPaint(hwnd, &ps);
             return 0;
         }
-        case WM_DESTROY:
+        case WM_DESTROY: {
+            std::lock_guard<std::mutex> lock(overlayMutex);
             hasActiveSquare = false;
             return 0;
+        }
         default:
             return DefWindowProcW(hwnd, msg, wParam, lParam);
     }
@@ -90,6 +99,8 @@ void DrawSquare(int x, int y, int width, int height, int r, int g, int b) {
     // Create/ensure our overlay window exists
     EnsureOverlayWindow();
     
+    std::lock_guard<std::mutex> lock(overlayMutex);
+    
     // Store the current rectangle and color
     currentRect.left = x;
     currentRect.top = y;
@@ -102,6 +113,84 @@ void DrawSquare(int x, int y, int width, int height, int r, int g, int b) {
     InvalidateRect(overlayWindow, NULL, TRUE);
     UpdateWindow(overlayWindow);
 }
+
+// AsyncWorker for SetSquare
+class SetSquareWorker : public Napi::AsyncWorker {
+public:
+    SetSquareWorker(const Napi::Env& env,
+                    int x, int y, int width, int height,
+                    int r, int g, int b)
+        : Napi::AsyncWorker(env),
+          x_(x), y_(y), width_(width), height_(height),
+          r_(r), g_(g), b_(b) {}
+
+    void Execute() override {
+        // The actual window operations need to happen on the main thread
+        // So we just validate here
+        if (r_ < 0 || r_ > 255 || g_ < 0 || g_ > 255 || b_ < 0 || b_ > 255) {
+            SetError("RGB values must be between 0 and 255");
+            return;
+        }
+        success_ = true;
+    }
+
+    void OnOK() override {
+        Napi::HandleScope scope(Env());
+        
+        // Do the actual drawing on the main thread
+        DrawSquare(x_, y_, width_, height_, r_, g_, b_);
+        
+        deferred_.Resolve(Napi::Boolean::New(Env(), success_));
+    }
+
+    void OnError(const Napi::Error& error) override {
+        deferred_.Reject(error.Value());
+    }
+
+    Napi::Promise GetPromise() { return deferred_.Promise(); }
+
+private:
+    Napi::Promise::Deferred deferred_ = Napi::Promise::Deferred::New(Env());
+    int x_, y_, width_, height_;
+    int r_, g_, b_;
+    bool success_ = false;
+};
+
+// AsyncWorker for ClearSquare
+class ClearSquareWorker : public Napi::AsyncWorker {
+public:
+    ClearSquareWorker(const Napi::Env& env)
+        : Napi::AsyncWorker(env) {}
+
+    void Execute() override {
+        // Nothing to do in the worker thread
+        success_ = true;
+    }
+
+    void OnOK() override {
+        Napi::HandleScope scope(Env());
+        
+        // Clear on the main thread
+        if (overlayWindow != NULL) {
+            std::lock_guard<std::mutex> lock(overlayMutex);
+            hasActiveSquare = false;
+            InvalidateRect(overlayWindow, NULL, TRUE);
+            UpdateWindow(overlayWindow);
+        }
+        
+        deferred_.Resolve(Napi::Boolean::New(Env(), success_));
+    }
+
+    void OnError(const Napi::Error& error) override {
+        deferred_.Reject(error.Value());
+    }
+
+    Napi::Promise GetPromise() { return deferred_.Promise(); }
+
+private:
+    Napi::Promise::Deferred deferred_ = Napi::Promise::Deferred::New(Env());
+    bool success_ = false;
+};
 
 Napi::Value SetSquare(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
@@ -123,29 +212,18 @@ Napi::Value SetSquare(const Napi::CallbackInfo& info) {
     int g = info[5].As<Napi::Number>().Int32Value();
     int b = info[6].As<Napi::Number>().Int32Value();
 
-    // Validate color values
-    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
-        Napi::Error::New(env, "RGB values must be between 0 and 255").ThrowAsJavaScriptException();
-        return env.Null();
-    }
-
-    // Draw the square
-    DrawSquare(x, y, width, height, r, g, b);
-    
-    return Napi::Boolean::New(env, true);
+    auto* worker = new SetSquareWorker(env, x, y, width, height, r, g, b);
+    worker->Queue();
+    return worker->GetPromise();
 }
 
 // Method to clear the square (hide it)
 Napi::Value ClearSquare(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     
-    if (overlayWindow != NULL) {
-        hasActiveSquare = false;
-        InvalidateRect(overlayWindow, NULL, TRUE);
-        UpdateWindow(overlayWindow);
-    }
-    
-    return Napi::Boolean::New(env, true);
+    auto* worker = new ClearSquareWorker(env);
+    worker->Queue();
+    return worker->GetPromise();
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
@@ -154,4 +232,4 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     return exports;
 }
 
-NODE_API_MODULE(NODE_GYP_MODULE_NAME, Init); 
+CASHEW_MODULE_INIT(screenRaw, Init) 

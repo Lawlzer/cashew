@@ -1,12 +1,41 @@
-import { sleep, throwError } from '@lawlzer/utils';
+import { throwError } from '@lawlzer/utils';
 
 import { type KeyboardBinding, keyboardSchema, loadBinding } from './bindingLoader';
 import { Config } from './config';
 
-// Load the binding with the new Valibot-based loader
+// Load binding
 const keyboardBinding = loadBinding<KeyboardBinding>('keyboard', keyboardSchema);
 
-const keyAddonMap = {
+// Types for keyboard events
+export interface KeyPressEvent {
+	key: Key;
+	keyCode: number;
+	timestamp: number;
+}
+
+export interface KeyListenerOptions {
+	/**
+	 * Delay between key state checks in milliseconds.
+	 * Lower values = more responsive but higher CPU usage
+	 * @default 10
+	 */
+	pollInterval?: number;
+
+	/**
+	 * If true, the callback will only fire once per key press
+	 * (requires the key to be released before firing again)
+	 * @default true
+	 */
+	triggerOnce?: boolean;
+}
+
+// Track key states to detect press/release transitions
+const keyStates = new Map<string, boolean>();
+
+// Active listeners
+const activeListeners = new Map<string, AbortController>();
+
+const _keyAddonMap = {
 	// backspace: 8, // untested
 	'\t': 9,
 	tab: 9,
@@ -132,11 +161,151 @@ const keyAddonMap = {
 	'.': 190,
 	period: 190,
 } as const;
-export type Key = keyof typeof keyAddonMap;
+export type Key = keyof typeof _keyAddonMap;
 
-function keyToKeyCode(key: Key) {
-	return keyAddonMap[key] ?? throwError(`keycode not found for key: '${key}'`);
+export enum KeyModifier {
+	None = 0,
+	// eslint-disable-next-line @typescript-eslint/prefer-literal-enum-member
+	Alt = 1 << 0,
+	// eslint-disable-next-line @typescript-eslint/prefer-literal-enum-member
+	Ctrl = 1 << 1,
+	// eslint-disable-next-line @typescript-eslint/prefer-literal-enum-member
+	Shift = 1 << 2,
+	// eslint-disable-next-line @typescript-eslint/prefer-literal-enum-member
+	Win = 1 << 3,
 }
+
+export const stringToKeycode = new Map<string, number>([
+	['backspace', 0x08],
+	['tab', 0x09],
+	['enter', 0x0d],
+	['shift', 0x10],
+	['ctrl', 0x11],
+	['control', 0x11],
+	['alt', 0x12],
+	['pause', 0x13],
+	['caps_lock', 0x14],
+	['escape', 0x1b],
+	['space', 0x20],
+	['pageup', 0x21],
+	['pagedown', 0x22],
+	['end', 0x23],
+	['home', 0x24],
+	['left', 0x25],
+	['leftarrow', 0x25],
+	['up', 0x26],
+	['uparrow', 0x26],
+	['right', 0x27],
+	['rightarrow', 0x27],
+	['down', 0x28],
+	['downarrow', 0x28],
+	['insert', 0x2d],
+	['delete', 0x2e],
+	['0', 0x30],
+	['1', 0x31],
+	['2', 0x32],
+	['3', 0x33],
+	['4', 0x34],
+	['5', 0x35],
+	['6', 0x36],
+	['7', 0x37],
+	['8', 0x38],
+	['9', 0x39],
+	['a', 0x41],
+	['b', 0x42],
+	['c', 0x43],
+	['d', 0x44],
+	['e', 0x45],
+	['f', 0x46],
+	['g', 0x47],
+	['h', 0x48],
+	['i', 0x49],
+	['j', 0x4a],
+	['k', 0x4b],
+	['l', 0x4c],
+	['m', 0x4d],
+	['n', 0x4e],
+	['o', 0x4f],
+	['p', 0x50],
+	['q', 0x51],
+	['r', 0x52],
+	['s', 0x53],
+	['t', 0x54],
+	['u', 0x55],
+	['v', 0x56],
+	['w', 0x57],
+	['x', 0x58],
+	['y', 0x59],
+	['z', 0x5a],
+	['leftwindowskey', 0x5b],
+	['numpad0', 0x60],
+	['numpad1', 0x61],
+	['numpad2', 0x62],
+	['numpad3', 0x63],
+	['numpad4', 0x64],
+	['numpad5', 0x65],
+	['numpad6', 0x66],
+	['numpad7', 0x67],
+	['numpad8', 0x68],
+	['numpad9', 0x69],
+	['multiply', 0x6a],
+	['add', 0x6b],
+	['separator', 0x6c],
+	['subtract', 0x6d],
+	['decimal', 0x6e],
+	['divide', 0x6f],
+	['f1', 0x70],
+	['f2', 0x71],
+	['f3', 0x72],
+	['f4', 0x73],
+	['f5', 0x74],
+	['f6', 0x75],
+	['f7', 0x76],
+	['f8', 0x77],
+	['f9', 0x78],
+	['f10', 0x79],
+	['f11', 0x7a],
+	['f12', 0x7b],
+	['f13', 0x7c],
+	['f14', 0x7d],
+	['f15', 0x7e],
+	['f16', 0x7f],
+	['f17', 0x80],
+	['f18', 0x81],
+	['f19', 0x82],
+	['f20', 0x83],
+	['f21', 0x84],
+	['f22', 0x85],
+	['f23', 0x86],
+	['f24', 0x87],
+	['leftshift', 0xa0],
+	['rightshift', 0xa1],
+	['leftcontrol', 0xa2],
+	['rightcontrol', 0xa3],
+	['leftalt', 0xa4],
+	['rightalt', 0xa5],
+	['volumemute', 0xad],
+	['volumedown', 0xae],
+	['volumeup', 0xaf],
+	['`', 0xc0],
+	['-', 0xbd],
+	['minus', 0xbd],
+	['dash', 0xbd],
+	['=', 0xbb],
+	['plus', 0xbb],
+	[';', 0xba],
+	['semicolon', 0xba],
+	['maybesemicolon', 0xba],
+	["'", 0xde],
+	[',', 0xbc],
+	['comma', 0xbc],
+	['.', 0xbe],
+	['period', 0xbe],
+	['/', 0xbf],
+	['\\', 0xdc],
+	['[', 0xdb],
+	[']', 0xdd],
+]);
 
 export class Keyboard {
 	/**
@@ -144,10 +313,14 @@ export class Keyboard {
 	 * and other applications where standard input methods are inconsistent.
 	 */
 	public static async holdKey(inputKey: Key, windowTitle?: string): Promise<void> {
-		const windowTitleFinal = windowTitle ?? Config.windowTitle ?? '';
-		// Uses SendInput with a different approach than the standard holdKey
-		const keyCode = keyToKeyCode(inputKey);
-		await keyboardBinding.holdKey(keyCode, windowTitleFinal);
+		const keyCode = stringToKeycode.get(inputKey.toLowerCase());
+
+		if (keyCode === undefined) {
+			throwError(`Key ${inputKey} is not supported.`);
+		}
+
+		const realWindowTitle = windowTitle ?? Config.windowTitle ?? '';
+		await keyboardBinding.holdKey(keyCode, realWindowTitle);
 	}
 
 	/**
@@ -155,39 +328,52 @@ export class Keyboard {
 	 * WARNING: Often requires the target window to be in the foreground.
 	 */
 	public static async releaseKey(inputKey: Key, windowTitle?: string): Promise<void> {
-		const windowTitleFinal = windowTitle ?? Config.windowTitle ?? '';
-		const keyCode = keyToKeyCode(inputKey);
-		await keyboardBinding.releaseKey(keyCode, windowTitleFinal);
+		const keyCode = stringToKeycode.get(inputKey.toLowerCase());
+		if (keyCode === undefined) {
+			throwError(`Key ${inputKey} is not supported.`);
+		}
+
+		const realWindowTitle = windowTitle ?? Config.windowTitle ?? '';
+		await keyboardBinding.releaseKey(keyCode, realWindowTitle);
 	}
 
 	/**
 	 * Taps a key (press and release).
 	 */
 	public static async tapKey(inputKey: Key, windowTitle?: string): Promise<void> {
-		const windowTitleFinal = windowTitle ?? Config.windowTitle ?? '';
-		const keyCode = keyToKeyCode(inputKey);
-		await keyboardBinding.tapKey(keyCode, windowTitleFinal);
+		const keyCode = stringToKeycode.get(inputKey.toLowerCase());
+		if (keyCode === undefined) {
+			throwError(`Key ${inputKey} is not supported.`);
+		}
+
+		const realWindowTitle = windowTitle ?? Config.windowTitle ?? '';
+		await keyboardBinding.tapKey(keyCode, realWindowTitle);
 	}
 
 	/**
 	 * Holds a key for a specified duration using the scan code method.
 	 */
-	public static async holdKeyFor(inputKey: Key, holdFor: number, windowTitle?: string): Promise<void> {
-		const windowTitleFinal = windowTitle ?? Config.windowTitle ?? '';
-		await this.holdKey(inputKey, windowTitleFinal);
-		await sleep(holdFor);
-		await this.releaseKey(inputKey, windowTitleFinal);
+	public static async holdKeyFor(inputKey: Key, holdFor: number, _windowTitle?: string): Promise<void> {
+		const keyCode = stringToKeycode.get(inputKey.toLowerCase());
+		if (keyCode === undefined) {
+			throwError(`Key ${inputKey} is not supported.`);
+		}
+
+		await keyboardBinding.holdKeyForDuration(keyCode, holdFor);
 	}
 
 	public static async isKeyPressed(key: Key): Promise<boolean> {
-		const result = await keyboardBinding.isKeyPressed(keyToKeyCode(key));
-		if (typeof result !== 'boolean') throwError('result was not a boolean: ', result);
-		return result;
+		const keyCode = stringToKeycode.get(key.toLowerCase());
+		if (keyCode === undefined) throwError(`Key ${key} is not supported.`);
+
+		return keyboardBinding.isKeyPressed(keyCode);
 	}
 
 	public static async waitForKeyPress(key: Key, msDelayPerCheck = 10): Promise<void> {
 		while (!(await this.isKeyPressed(key))) {
-			await sleep(msDelayPerCheck);
+			await new Promise<void>((resolve) => {
+				setTimeout(resolve, msDelayPerCheck);
+			});
 		}
 	}
 
@@ -195,11 +381,202 @@ export class Keyboard {
 	 * Will not work for anything more than alphanumeric (a-z, 0-9) characters.
 	 */
 	public static async type(text: string, options?: { windowTitle?: string; delayPerKey?: number }): Promise<void> {
+		const keycodesArray: number[] = [];
+		for (const char of text) {
+			keycodesArray.push(char.charCodeAt(0));
+		}
+
 		const windowTitle = options?.windowTitle ?? Config.windowTitle ?? '';
-
-		const keycodesArray = text.split('').map((char) => keyToKeyCode(char as Key));
-
 		await keyboardBinding.type(keycodesArray, windowTitle, options?.delayPerKey ?? 1);
+	}
+
+	/**
+	 * Listen for a specific key press and execute a callback when it occurs.
+	 * Returns a cleanup function to stop listening.
+	 */
+	public static onKeypress(key: Key, callback: (event: KeyPressEvent) => void, options: KeyListenerOptions = {}): () => void {
+		const { pollInterval = 10, triggerOnce = true } = options;
+
+		const keyCode = stringToKeycode.get(key.toLowerCase());
+		if (keyCode === undefined) {
+			throw new Error(`Key ${key} is not supported.`);
+		}
+
+		// Create unique ID for this listener
+		const listenerId = `${key}-${Date.now()}-${Math.random()}`;
+		const abortController = new AbortController();
+		activeListeners.set(listenerId, abortController);
+
+		// Initialize key state
+		const keyStateId = key.toLowerCase();
+		keyStates.set(keyStateId, false);
+
+		// Polling function
+		const checkKeyState = async () => {
+			let lastState = keyStates.get(keyStateId) ?? false;
+
+			while (!abortController.signal.aborted) {
+				try {
+					const isPressed = await Keyboard.isKeyPressed(key);
+					const wasPressed = lastState;
+
+					// Detect key press transition
+					if (isPressed && (!wasPressed || !triggerOnce)) {
+						const event: KeyPressEvent = {
+							key,
+							keyCode,
+							timestamp: Date.now(),
+						};
+
+						// Call the callback
+						try {
+							callback(event);
+						} catch (error) {
+							console.error('Error in keypress callback:', error);
+						}
+					}
+
+					lastState = isPressed;
+					keyStates.set(keyStateId, isPressed);
+				} catch (error) {
+					console.error('Error checking key state:', error);
+				}
+
+				// Wait before next check
+				await new Promise<void>((resolve) => {
+					const timeout = setTimeout(resolve, pollInterval);
+
+					// Clean up timeout if aborted
+					abortController.signal.addEventListener(
+						'abort',
+						() => {
+							clearTimeout(timeout);
+							resolve();
+						},
+						{ once: true }
+					);
+				});
+			}
+		};
+
+		// Start polling
+		checkKeyState().catch((error) => {
+			console.error('Key listener error:', error);
+		});
+
+		// Return cleanup function
+		return () => {
+			abortController.abort();
+			activeListeners.delete(listenerId);
+		};
+	}
+
+	/**
+	 * Listen for all key presses and execute a callback for each.
+	 * Returns a cleanup function to stop listening.
+	 */
+	public static getAllKeypresses(callback: (event: KeyPressEvent) => void, options: KeyListenerOptions = {}): () => void {
+		const { pollInterval = 10, triggerOnce = true } = options;
+
+		// Get all available keys
+		const allKeys = Array.from(stringToKeycode.keys()) as Key[];
+
+		// Create abort controller for this listener group
+		const groupId = `all-keys-${Date.now()}`;
+		const abortController = new AbortController();
+		activeListeners.set(groupId, abortController);
+
+		// Track states for all keys
+		const localKeyStates = new Map<string, boolean>();
+		allKeys.forEach((key) => {
+			localKeyStates.set(key.toLowerCase(), false);
+		});
+
+		// Polling function
+		const checkAllKeys = async () => {
+			while (!abortController.signal.aborted) {
+				try {
+					// Check all keys in parallel for better performance
+					const keyChecks = allKeys.map(async (key) => {
+						try {
+							const isPressed = await Keyboard.isKeyPressed(key);
+							return { key, isPressed };
+						} catch {
+							// Ignore errors for individual keys
+							return { key, isPressed: false };
+						}
+					});
+
+					const results = await Promise.all(keyChecks);
+
+					// Process results
+					for (const { key, isPressed } of results) {
+						const keyStateId = key.toLowerCase();
+						const wasPressed = localKeyStates.get(keyStateId) ?? false;
+
+						// Detect key press transition
+						if (isPressed && (!wasPressed || !triggerOnce)) {
+							const keyCode = stringToKeycode.get(key.toLowerCase());
+							if (keyCode !== undefined) {
+								const event: KeyPressEvent = {
+									key,
+									keyCode,
+									timestamp: Date.now(),
+								};
+
+								// Call the callback
+								try {
+									callback(event);
+								} catch (error) {
+									console.error('Error in keypress callback:', error);
+								}
+							}
+						}
+
+						localKeyStates.set(keyStateId, isPressed);
+					}
+				} catch (error) {
+					console.error('Error checking all keys:', error);
+				}
+
+				// Wait before next check
+				await new Promise<void>((resolve) => {
+					const timeout = setTimeout(resolve, pollInterval);
+
+					// Clean up timeout if aborted
+					abortController.signal.addEventListener(
+						'abort',
+						() => {
+							clearTimeout(timeout);
+							resolve();
+						},
+						{ once: true }
+					);
+				});
+			}
+		};
+
+		// Start polling
+		checkAllKeys().catch((error) => {
+			console.error('All keys listener error:', error);
+		});
+
+		// Return cleanup function
+		return () => {
+			abortController.abort();
+			activeListeners.delete(groupId);
+		};
+	}
+
+	/**
+	 * Stop all active keyboard listeners
+	 */
+	public static stopAllKeyboardListeners(): void {
+		activeListeners.forEach((controller) => {
+			controller.abort();
+		});
+		activeListeners.clear();
+		keyStates.clear();
 	}
 }
 

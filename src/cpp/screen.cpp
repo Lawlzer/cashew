@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <optional>
 #include <deque>
+#include <memory>
 
 #include <algorithm> // For std::transform
 #include <stdint.h>  // For uint32_t
@@ -25,6 +26,211 @@ HWND FindWindowByTitle(const std::string& title) {
     }
     return hwnd;
 }
+
+// AsyncWorker for window pixel capture
+class GetWindowPixelsWorker : public Napi::AsyncWorker {
+public:
+    GetWindowPixelsWorker(const Napi::Env& env, 
+                         const std::string& windowTitle,
+                         int x, int y, int width, int height)
+        : Napi::AsyncWorker(env),
+          windowTitle_(windowTitle),
+          x_(x), y_(y), width_(width), height_(height),
+          pixelCount_(width * height) {
+        // Pre-allocate buffer
+        pixels_ = std::make_unique<uint32_t[]>(pixelCount_);
+    }
+
+    void Execute() override {
+        // This runs on a worker thread
+        HWND hwnd = FindWindowA(NULL, windowTitle_.c_str());
+        if (!hwnd) {
+            SetError("Window not found: " + windowTitle_);
+            return;
+        }
+
+        // Use RAII handles for automatic cleanup
+        DcHandle hDc(hwnd);
+        if (!hDc.get()) {
+            SetError("Failed to get device context");
+            return;
+        }
+
+        CompatibleDcHandle hDcMem(hDc);
+        if (!hDcMem.get()) {
+            SetError("Failed to create compatible DC");
+            return;
+        }
+
+        // Create bitmap
+        int bmpWidth = x_ + width_;
+        int bmpHeight = y_ + height_;
+        BitmapHandle hBmp(hDc, bmpWidth, bmpHeight);
+        if (!hBmp.get()) {
+            SetError("Failed to create bitmap");
+            return;
+        }
+
+        SelectObject(hDcMem, hBmp);
+
+        // Capture window content
+        if (!PrintWindow(hwnd, hDcMem, PW_RENDERFULLCONTENT)) {
+            SetError("PrintWindow failed");
+            return;
+        }
+
+        // Setup bitmap info
+        BITMAPINFO bmi{};
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = bmpWidth;
+        bmi.bmiHeader.biHeight = -bmpHeight; // Top-down bitmap
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
+
+        // Get full image data
+        std::vector<uint32_t> fullImageData(bmpWidth * bmpHeight);
+        if (!GetDIBits(hDcMem, hBmp, 0, bmpHeight, fullImageData.data(), &bmi, DIB_RGB_COLORS)) {
+            SetError("GetDIBits failed");
+            return;
+        }
+
+        // Extract the relevant portion
+        for (int row = 0; row < height_; ++row) {
+            for (int col = 0; col < width_; ++col) {
+                int srcIndex = (row + y_) * bmpWidth + (col + x_);
+                int destIndex = row * width_ + col;
+                pixels_[destIndex] = fullImageData[srcIndex];
+            }
+        }
+
+        // Convert BGRA to RGBA
+        ConvertBGRAtoRGBA(pixels_.get(), pixelCount_);
+        success_ = true;
+    }
+
+    void OnOK() override {
+        // This runs on the main thread
+        Napi::HandleScope scope(Env());
+        
+        // Create a buffer from our pixel data
+        Napi::Buffer<uint32_t> buffer = Napi::Buffer<uint32_t>::New(Env(), pixelCount_);
+        memcpy(buffer.Data(), pixels_.get(), pixelCount_ * sizeof(uint32_t));
+        
+        deferred_.Resolve(buffer);
+    }
+
+    void OnError(const Napi::Error& error) override {
+        deferred_.Reject(error.Value());
+    }
+
+    Napi::Promise GetPromise() {
+        return deferred_.Promise();
+    }
+
+private:
+    Napi::Promise::Deferred deferred_ = Napi::Promise::Deferred::New(Env());
+    std::string windowTitle_;
+    int x_, y_, width_, height_;
+    size_t pixelCount_;
+    std::unique_ptr<uint32_t[]> pixels_;
+    bool success_ = false;
+};
+
+// AsyncWorker for screen pixel capture
+class GetScreenPixelsWorker : public Napi::AsyncWorker {
+public:
+    GetScreenPixelsWorker(const Napi::Env& env,
+                         int x, int y, int width, int height)
+        : Napi::AsyncWorker(env),
+          x_(x), y_(y), width_(width), height_(height),
+          pixelCount_(width * height) {
+        // Pre-allocate buffer
+        pixels_ = std::make_unique<uint32_t[]>(pixelCount_);
+    }
+
+    void Execute() override {
+        // This runs on a worker thread
+        HWND hwnd = GetDesktopWindow();
+        if (!hwnd) {
+            SetError("Failed to get desktop window");
+            return;
+        }
+
+        // Use RAII handles for automatic cleanup
+        DcHandle hDc(hwnd);
+        if (!hDc.get()) {
+            SetError("Failed to get device context");
+            return;
+        }
+
+        CompatibleDcHandle hDcMem(hDc);
+        if (!hDcMem.get()) {
+            SetError("Failed to create compatible DC");
+            return;
+        }
+
+        // Create bitmap
+        BitmapHandle hBmp(hDc, width_, height_);
+        if (!hBmp.get()) {
+            SetError("Failed to create bitmap");
+            return;
+        }
+
+        SelectObject(hDcMem, hBmp);
+
+        // Capture screen content
+        if (!BitBlt(hDcMem, 0, 0, width_, height_, hDc, x_, y_, SRCCOPY)) {
+            SetError("BitBlt failed");
+            return;
+        }
+
+        // Setup bitmap info
+        BITMAPINFO bmi{};
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = width_;
+        bmi.bmiHeader.biHeight = -height_; // Top-down bitmap
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
+
+        // Get pixel data
+        if (!GetDIBits(hDcMem, hBmp, 0, height_, pixels_.get(), &bmi, DIB_RGB_COLORS)) {
+            SetError("GetDIBits failed");
+            return;
+        }
+
+        // Convert BGRA to RGBA
+        ConvertBGRAtoRGBA(pixels_.get(), pixelCount_);
+        success_ = true;
+    }
+
+    void OnOK() override {
+        // This runs on the main thread
+        Napi::HandleScope scope(Env());
+        
+        // Create a buffer from our pixel data
+        Napi::Buffer<uint32_t> buffer = Napi::Buffer<uint32_t>::New(Env(), pixelCount_);
+        memcpy(buffer.Data(), pixels_.get(), pixelCount_ * sizeof(uint32_t));
+        
+        deferred_.Resolve(buffer);
+    }
+
+    void OnError(const Napi::Error& error) override {
+        deferred_.Reject(error.Value());
+    }
+
+    Napi::Promise GetPromise() {
+        return deferred_.Promise();
+    }
+
+private:
+    Napi::Promise::Deferred deferred_ = Napi::Promise::Deferred::New(Env());
+    int x_, y_, width_, height_;
+    size_t pixelCount_;
+    std::unique_ptr<uint32_t[]> pixels_;
+    bool success_ = false;
+};
 
 // Helper function to capture pixels from a specific area
 Napi::Buffer<uint32_t> CapturePixels(const Napi::CallbackInfo& info, HWND hwnd, 
@@ -136,10 +342,9 @@ Napi::Value GetWindowPixels(const Napi::CallbackInfo& info) {
     int width = info[3].As<Napi::Number>().Int32Value();
     int height = info[4].As<Napi::Number>().Int32Value();
     
-    HWND hwnd = FindWindowSafe(env, windowTitle);
-    if (!hwnd) return env.Null();
-    
-    return CapturePixels(info, hwnd, x, y, width, height, true);
+    auto* worker = new GetWindowPixelsWorker(env, windowTitle, x, y, width, height);
+    worker->Queue();
+    return worker->GetPromise();
 }
 
 Napi::Value GetScreenPixels(const Napi::CallbackInfo& info) {
@@ -164,13 +369,9 @@ Napi::Value GetScreenPixels(const Napi::CallbackInfo& info) {
     int width = info[2].As<Napi::Number>().Int32Value();
     int height = info[3].As<Napi::Number>().Int32Value();
     
-    HWND hwnd = GetDesktopWindow();
-    if (!hwnd) {
-        Napi::Error::New(env, "Failed to get desktop window").ThrowAsJavaScriptException();
-        return env.Null();
-    }
-    
-    return CapturePixels(info, hwnd, x, y, width, height, false);
+    auto* worker = new GetScreenPixelsWorker(env, x, y, width, height);
+    worker->Queue();
+    return worker->GetPromise();
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {

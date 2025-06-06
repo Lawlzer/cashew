@@ -1,67 +1,81 @@
-import { throwError } from '@lawlzer/utils';
-
 import { loadBinding, type MouseBinding, mouseSchema } from './bindingLoader';
+import { Config } from './config';
 import type { Position } from './misc';
 
-// Load the binding with the new Valibot-based loader
+// Load binding
 const mouseBinding = loadBinding<MouseBinding>('mouse', mouseSchema);
 
-function isPosition(pos: any): pos is Position {
-	return typeof pos === 'object' && typeof pos.x === 'number' && typeof pos.y === 'number';
+export interface ClickOptions {
+	button?: 'left' | 'right';
+	position?: Position;
+	clickCount?: number;
+	holdFor?: number;
+	delayAfter?: number;
 }
 
 export class Mouse {
 	/**
-	 * WARNING: "holdFor" and "delayAfter" are ran in CPP, and are therefore blocking.
-	 *
-	 * This function is (probably long-term/forever) disabled, because Windows does not seem to allow you to click on background applications, without bringing them to the foreground first.
-	 */
-
-	// public static async click(options: { button?: 'left' | 'right'; position: Position; clickCount?: number; holdFor?: number; delayAfter?: number }): Promise<void> {
-	// 	throwError('Mouse.click is disabled --- Windows do not seem to allow you to click on background applications, without bringing them to the foreground first.');
-	// }
-
-	/**
-	 * An alternative to clickDesktop, that *attempts* to click on background windows. will likely fail :(
+	 * Send a click message to a window (works even when window is in background)
 	 */
 	public static async clickMessage(options: { position: Position; windowTitle: string; type: 'post' | 'send'; holdFor?: number }): Promise<void> {
-		const holdFor = options.holdFor ?? 30;
-		// We are hardcoding button to left implicitly via WM_LBUTTONDOWN/UP in C++.
-		// If right/middle clicks are needed later, the C++ side would need adjustment.
+		const holdFor = options.holdFor ?? 0;
 		await mouseBinding.clickMessage(options.position.x, options.position.y, holdFor, options.windowTitle, options.type);
 	}
 
+	/**
+	 * Standard click that moves mouse to position and clicks
+	 */
 	public static async click(options?: { button?: 'left' | 'right'; position?: Position; holdFor?: number; windowTitle?: string }): Promise<void> {
 		const button = options?.button ?? 'left';
-		const holdFor = options?.holdFor ?? 30;
+		const holdFor = options?.holdFor ?? 0;
+		const windowTitle = options?.windowTitle ?? Config.windowTitle ?? '';
+
+		// Pass null for x/y if no position specified
 		const x = options?.position?.x ?? null;
 		const y = options?.position?.y ?? null;
-		const windowTitle = options?.windowTitle;
 
-		// We might need to ensure the C++ side explicitly checks for Napi::Value::IsUndefined() or expects a Null/empty string.
-		// Passing undefined might implicitly convert to null depending on N-API/Node.js version behavior. Let's explicitly pass an empty string if undefined.
-		// await mouseAddon.clickDesktop(x, y, button, holdFor, windowTitle ?? '');
-		await mouseBinding.click(x, y, button, holdFor, windowTitle ?? '');
+		await mouseBinding.click(x, y, button, holdFor, windowTitle);
 	}
 
 	public static async getPosition(): Promise<Position> {
-		const position = await mouseBinding.getPosition();
-
-		if (!isPosition(position)) throwError('position was not an object: ', position);
-		return position;
+		const pos = await mouseBinding.getPosition();
+		return {
+			x: pos.x,
+			y: pos.y,
+		};
 	}
 
 	public static async hold(options: { button?: 'left' | 'right'; position?: Position }): Promise<void> {
-		options.button ??= 'left';
+		const button = options.button ?? 'left';
 		const x = options.position?.x ?? null;
 		const y = options.position?.y ?? null;
-		await mouseBinding.hold(x, y, options.button);
+		await mouseBinding.hold(x, y, button);
 	}
 
 	public static async release(options: { button?: 'left' | 'right'; position?: Position }): Promise<void> {
-		options.button ??= 'left';
+		const button = options.button ?? 'left';
 		const x = options.position?.x ?? null;
 		const y = options.position?.y ?? null;
-		await mouseBinding.release(x, y, options.button);
+		await mouseBinding.release(x, y, button);
+	}
+
+	/**
+	 * Move mouse relative to current position with optional smooth animation
+	 */
+	public static async moveRelative(options: { dx: number; dy: number; smoothDuration?: number; useRawInput?: boolean }): Promise<void> {
+		const smoothDuration = options.smoothDuration ?? 0;
+		const useRawInput = options.useRawInput ?? false;
+		await mouseBinding.moveRelative(options.dx, options.dy, smoothDuration, useRawInput);
+	}
+
+	/**
+	 * Move mouse in a direction by angle and distance
+	 * @param angle Angle in degrees (0 = right, 90 = up, 180 = left, 270 = down)
+	 * @param distance Distance in pixels
+	 */
+	public static async moveRelativePolar(options: { angle: number; distance: number; smoothDuration?: number; useRawInput?: boolean }): Promise<void> {
+		const smoothDuration = options.smoothDuration ?? 0;
+		const useRawInput = options.useRawInput ?? false;
+		await mouseBinding.moveRelativePolar(options.angle, options.distance, smoothDuration, useRawInput);
 	}
 }

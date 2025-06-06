@@ -44,7 +44,7 @@ async function copyNativeBindings(): Promise<void> {
 	await fs.mkdir(destDir, { recursive: true });
 
 	// Copy all .node files
-	const nodeFiles = ['clipboard.node', 'screen.node', 'keyboard.node', 'mouse.node', 'misc.node', 'screenRaw.node'];
+	const nodeFiles = ['clipboard.node', 'screen.node', 'keyboard.node', 'mouse.node', 'misc.node', 'screenRaw.node', 'panicShutdown.node'];
 
 	for (const nodeFile of nodeFiles) {
 		const sourcePath = pathModule.join(sourceDir, nodeFile);
@@ -96,4 +96,11 @@ async function buildAll(): Promise<esbuild.BuildResult[]> {
 	return results;
 }
 
-void buildAll();
+buildAll()
+	.then(() => {
+		console.info('Build completed successfully');
+	})
+	.catch((error) => {
+		console.error('Build failed:', error);
+		process.exit(1);
+	});
