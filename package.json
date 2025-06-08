@@ -23,14 +23,18 @@
 	"files": [
 		"src",
 		"dist",
-		"build/Release"
+		"!dist/**/*.map"
 	],
 	"scripts": {
-		"build": "npm run clean && npm run build:types && npm run build:js && npm run build:cpp",
+		"build": "node build-parallel.js",
+		"build:clean": "node build-parallel.js --clean",
 		"build:cpp": "node-gyp configure && node-gyp build",
+		"build:cpp:optimized": "node scripts/build-cpp-optimized.js",
 		"build:js": "tsup --config ./.config/tsup.config.ts",
-		"build:types": "tsc --emitDeclarationOnly --declaration --declarationMap --outDir ./dist --rootDir ./src",
+		"build:legacy": "npm run clean && npm run build:types && npm run build:js && npm run build:cpp",
+		"build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --declarationMap --outDir ./dist",
 		"clean": "rimraf ./dist ./build",
+		"clean:generated": "node scripts/clean-generated.js",
 		"lint": "lint-staged",
 		"lint:all": "npm run lint:eslint && npm run lint:prettier",
 		"lint:eslint": "eslint --fix --config ./.config/.eslint.config.mjs",
@@ -54,10 +58,7 @@
 	"devDependencies": {
 		"@lawlzer/prettier": "^0.0.4",
 		"@types/bun": "^1.2.15",
-		"@types/ms": "^2.1.0",
 		"@types/node": "^22.15.29",
-		"@types/react": "^19.1.6",
-		"@types/react-dom": "^19.1.6",
 		"@typescript-eslint/parser": "^8.33.1",
 		"cross-env": "^7.0.3",
 		"eslint": "^9.28.0",

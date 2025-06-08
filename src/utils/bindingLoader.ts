@@ -277,13 +277,12 @@ function loadNativeBinding(name: string): unknown {
 	const bindingName = `${name}.node`;
 
 	// Special handling for Bun
-
 	if (typeof Bun !== 'undefined') {
 		try {
 			// Try using Bun's native require if available
 			if (typeof require === 'function') {
 				// Try common paths for Bun
-				const bunPaths = [path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName), path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName)];
+				const bunPaths = [path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName), path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName)];
 
 				// Try direct loading with require
 				for (const p of bunPaths) {
@@ -316,27 +315,29 @@ function loadNativeBinding(name: string): unknown {
 	const packageRoot = getDirInfo();
 
 	// Build comprehensive list of paths to try
+	// IMPORTANT: When installed as dependency, bindings are in dist/build/Release
 	const paths = [
 		// Direct require attempts
 		name,
 		bindingName,
 
-		// Paths relative to package root
+		// Paths relative to package root - PRIORITIZE dist/build/Release
+		path.join(packageRoot, 'dist', 'build', 'Release', bindingName),
 		path.join(packageRoot, 'build', 'Release', bindingName),
 		path.join(packageRoot, 'build', 'Debug', bindingName),
-		path.join(packageRoot, 'dist', 'build', 'Release', bindingName),
 
 		// Paths relative to current directory (for when running from source)
 		path.join(process.cwd(), 'build', 'Release', bindingName),
 		path.join(process.cwd(), 'build', 'Debug', bindingName),
+		path.join(process.cwd(), 'dist', 'build', 'Release', bindingName),
 
-		// For when the package is installed as a dependency
-		path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+		// For when the package is installed as a dependency - PRIORITIZE dist/build/Release
 		path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName),
-		path.join(process.cwd(), '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+		path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
 		path.join(process.cwd(), '..', 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName),
-		path.join(process.cwd(), '..', '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+		path.join(process.cwd(), '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
 		path.join(process.cwd(), '..', '..', 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName),
+		path.join(process.cwd(), '..', '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
 
 		// Legacy paths for compatibility
 		path.join(packageRoot, '..', 'build', 'Release', bindingName),
@@ -344,23 +345,22 @@ function loadNativeBinding(name: string): unknown {
 	];
 
 	// Add Bun-specific paths
-
 	if (typeof Bun !== 'undefined') {
 		// Bun might resolve modules differently, add more potential paths
 		const scriptDir = path.dirname(process.argv[1] || process.cwd());
 		paths.push(
-			// Try relative to the script location
-			path.join(scriptDir, 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+			// Try relative to the script location - PRIORITIZE dist/build/Release
 			path.join(scriptDir, 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName),
-			path.join(scriptDir, '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
-			path.join(scriptDir, '..', 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName)
+			path.join(scriptDir, 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName),
+			path.join(scriptDir, '..', 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName),
+			path.join(scriptDir, '..', 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName)
 		);
 
 		// Add paths for when running from a bundled dist file
 		// Look for node_modules in parent directories
 		let currentDir = process.cwd();
 		for (let i = 0; i < 5; i++) {
-			paths.push(path.join(currentDir, 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName), path.join(currentDir, 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName));
+			paths.push(path.join(currentDir, 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName), path.join(currentDir, 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName));
 			currentDir = path.dirname(currentDir);
 		}
 	}
@@ -374,14 +374,19 @@ function loadNativeBinding(name: string): unknown {
 				// Try to resolve the package first
 				const packagePath = require.resolve('@lawlzer/cashew/package.json');
 				const packageDir = path.dirname(packagePath);
-				paths.push(path.join(packageDir, 'build', 'Release', bindingName), path.join(packageDir, 'dist', 'build', 'Release', bindingName));
+				paths.push(path.join(packageDir, 'dist', 'build', 'Release', bindingName), path.join(packageDir, 'build', 'Release', bindingName));
 			} catch {
 				// Try to resolve the binding directly
 				try {
-					const resolvedPath = require.resolve(`@lawlzer/cashew/build/Release/${bindingName}`);
+					const resolvedPath = require.resolve(`@lawlzer/cashew/dist/build/Release/${bindingName}`);
 					paths.push(resolvedPath);
 				} catch {
-					// Continue with other paths
+					try {
+						const resolvedPath = require.resolve(`@lawlzer/cashew/build/Release/${bindingName}`);
+						paths.push(resolvedPath);
+					} catch {
+						// Continue with other paths
+					}
 				}
 			}
 		}
@@ -393,7 +398,7 @@ function loadNativeBinding(name: string): unknown {
 	// When running from dist/index.js, we need to go up to find build/Release
 	if (packageRoot.includes('dist')) {
 		const actualPackageRoot = path.dirname(packageRoot);
-		paths.push(path.join(actualPackageRoot, 'build', 'Release', bindingName), path.join(actualPackageRoot, 'dist', 'build', 'Release', bindingName));
+		paths.push(path.join(actualPackageRoot, 'dist', 'build', 'Release', bindingName), path.join(actualPackageRoot, 'build', 'Release', bindingName));
 	}
 
 	// Remove duplicates while preserving order
@@ -418,7 +423,6 @@ function loadNativeBinding(name: string): unknown {
 	}
 
 	// Special handling for Bun - try dlopen first
-
 	if (typeof Bun !== 'undefined' && existingPaths.length > 0) {
 		for (const bindingPath of existingPaths) {
 			try {

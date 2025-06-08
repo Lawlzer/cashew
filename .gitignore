@@ -58,3 +58,8 @@ whisper-openai-exp/
 feature_cache
 plans
 
+# Generated build files
+build-parallel.js
+build-parallel.d.ts
+.tsconfig.incremental.json
+
