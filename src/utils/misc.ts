@@ -1,4 +1,4 @@
-import { sleep, throwError } from '@lawlzer/utils';
+import { throwError } from '@lawlzer/utils';
 
 import { loadBinding, type MiscBinding, miscSchema, type PanicShutdownBinding, panicShutdownSchema } from './bindingLoader';
 import type { Key } from './keyboard';
@@ -231,21 +231,28 @@ export interface InitToggleMonitorParams {
 	onMessage?: string | false | null;
 	offMessage?: string | false | null;
 	initialState?: boolean;
-	pollingInterval?: number;
+	pollingInterval?: number; // @deprecated No longer used - native hooks are used instead
 	postToggleDelayMs?: number;
 }
 
-const keyPressStates = new Map<Key, boolean>();
-export async function initToggleMonitor({
+/**
+ * Initialize a toggle monitor that watches for a specific key press and toggles state.
+ * Uses native Windows keyboard hooks for efficient monitoring without polling.
+ *
+ * @param params Configuration for the toggle monitor
+ * @returns Cleanup function to stop monitoring
+ */
+export function initToggleMonitor({
 	key, //
 	func,
 	onMessage = null,
 	offMessage = null,
 	initialState = false,
-	pollingInterval = 20,
+	pollingInterval: _pollingInterval = 20, // This parameter is now ignored since we use native hooks
 	postToggleDelayMs = 250,
-}: InitToggleMonitorParams): Promise<void> {
+}: InitToggleMonitorParams): () => void {
 	let isActive = initialState;
+	let lastToggleTime = 0;
 
 	if (isActive && typeof onMessage === 'string') {
 		console.info(`Initializing toggle monitor for key "${key}". Initial state: ${onMessage}`);
@@ -255,41 +262,31 @@ export async function initToggleMonitor({
 		console.info(`Initializing toggle monitor for key "${key}". Initial state: ${isActive ? 'ON' : 'OFF'}. (Custom messages disabled)`);
 	}
 
-	try {
-		keyPressStates.set(key, await Keyboard.isKeyPressed(key));
-	} catch (e) {
-		console.error(`Error initializing key state for "${key}" via Keyboard.isKeyPressed. Ensure Keyboard is loaded and the method exists. Monitor may not function correctly.`, e);
-		keyPressStates.set(key, false); // Assume not pressed if an error occurs
-	}
-
-	// IIFE for the monitoring loop, runs in background for this specific key
-	(async () => {
-		while (true) {
-			try {
-				const currentKeyState = await Keyboard.isKeyPressed(key);
-				const previousKeyState = keyPressStates.get(key) ?? false;
-
-				if (currentKeyState && !previousKeyState) {
-					// Rising edge: key was just pressed
-					isActive = !isActive;
-					func(isActive); // Call the user's callback function
-					if (isActive && typeof onMessage === 'string') {
-						console.info(onMessage);
-					} else if (!isActive && typeof offMessage === 'string') {
-						console.info(offMessage);
-					}
-					await sleep(postToggleDelayMs); // Wait after processing the toggle
-				}
-				keyPressStates.set(key, currentKeyState); // Update the stored state for this key
-				await sleep(pollingInterval);
-			} catch (error) {
-				console.error(`Error in toggle monitor for key "${key}":`, error);
-				// Avoid busy-looping on errors
-				await sleep(1000);
+	// Use the native keyboard hook for efficient monitoring
+	const cleanup = Keyboard.onKeypress(
+		key,
+		(_event) => {
+			const now = Date.now();
+			// Debounce to prevent rapid toggling
+			if (now - lastToggleTime < postToggleDelayMs) {
+				return;
 			}
-		}
-	})().catch((unhandledError) => {
-		// This catches an error if the async IIFE itself fails catastrophically
-		console.error(`Unhandled critical error in monitor loop for key "${key}". The monitor for this key will stop.`, unhandledError);
-	});
+			lastToggleTime = now;
+
+			// Toggle the state
+			isActive = !isActive;
+			func(isActive); // Call the user's callback function
+
+			// Log the state change
+			if (isActive && typeof onMessage === 'string') {
+				console.info(onMessage);
+			} else if (!isActive && typeof offMessage === 'string') {
+				console.info(offMessage);
+			}
+		},
+		{ triggerOnce: true } // This ensures we only trigger on key press, not hold
+	);
+
+	// Return the cleanup function so the caller can stop monitoring when needed
+	return cleanup;
 }

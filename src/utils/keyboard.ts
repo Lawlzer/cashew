@@ -2,6 +2,7 @@ import { throwError } from '@lawlzer/utils';
 
 import { type KeyboardBinding, keyboardSchema, loadBinding } from './bindingLoader';
 import { Config } from './config';
+import { type NativeKeyEvent, registerKeyListener, stopAllKeyboardHooks as stopAllHooks } from './keyboardHooks';
 
 // Load binding
 const keyboardBinding = loadBinding<KeyboardBinding>('keyboard', keyboardSchema);
@@ -15,13 +16,6 @@ export interface KeyPressEvent {
 
 export interface KeyListenerOptions {
 	/**
-	 * Delay between key state checks in milliseconds.
-	 * Lower values = more responsive but higher CPU usage
-	 * @default 10
-	 */
-	pollInterval?: number;
-
-	/**
 	 * If true, the callback will only fire once per key press
 	 * (requires the key to be released before firing again)
 	 * @default true
@@ -29,11 +23,11 @@ export interface KeyListenerOptions {
 	triggerOnce?: boolean;
 }
 
-// Track key states to detect press/release transitions
+// Track key states to detect press/release transitions (kept for compatibility)
 const keyStates = new Map<string, boolean>();
 
-// Active listeners
-const activeListeners = new Map<string, AbortController>();
+// Active listeners - now stores unregister functions
+const activeListeners = new Map<string, { abort: () => void }>();
 
 const _keyAddonMap = {
 	// backspace: 8, // untested
@@ -392,10 +386,11 @@ export class Keyboard {
 
 	/**
 	 * Listen for a specific key press and execute a callback when it occurs.
+	 * Now uses native Windows hooks for better performance.
 	 * Returns a cleanup function to stop listening.
 	 */
 	public static onKeypress(key: Key, callback: (event: KeyPressEvent) => void, options: KeyListenerOptions = {}): () => void {
-		const { pollInterval = 10, triggerOnce = true } = options;
+		const { triggerOnce = true } = options;
 
 		const keyCode = stringToKeycode.get(key.toLowerCase());
 		if (keyCode === undefined) {
@@ -404,166 +399,81 @@ export class Keyboard {
 
 		// Create unique ID for this listener
 		const listenerId = `${key}-${Date.now()}-${Math.random()}`;
-		const abortController = new AbortController();
-		activeListeners.set(listenerId, abortController);
 
-		// Initialize key state
-		const keyStateId = key.toLowerCase();
-		keyStates.set(keyStateId, false);
+		// Wrap the native callback to match our interface
+		const nativeCallback = (event: NativeKeyEvent) => {
+			const keyPressEvent: KeyPressEvent = {
+				key,
+				keyCode: event.keyCode,
+				timestamp: event.timestamp,
+			};
 
-		// Polling function
-		const checkKeyState = async () => {
-			let lastState = keyStates.get(keyStateId) ?? false;
-
-			while (!abortController.signal.aborted) {
-				try {
-					const isPressed = await Keyboard.isKeyPressed(key);
-					const wasPressed = lastState;
-
-					// Detect key press transition
-					if (isPressed && (!wasPressed || !triggerOnce)) {
-						const event: KeyPressEvent = {
-							key,
-							keyCode,
-							timestamp: Date.now(),
-						};
-
-						// Call the callback
-						try {
-							callback(event);
-						} catch (error) {
-							console.error('Error in keypress callback:', error);
-						}
-					}
-
-					lastState = isPressed;
-					keyStates.set(keyStateId, isPressed);
-				} catch (error) {
-					console.error('Error checking key state:', error);
-				}
-
-				// Wait before next check
-				await new Promise<void>((resolve) => {
-					const timeout = setTimeout(resolve, pollInterval);
-
-					// Clean up timeout if aborted
-					abortController.signal.addEventListener(
-						'abort',
-						() => {
-							clearTimeout(timeout);
-							resolve();
-						},
-						{ once: true }
-					);
-				});
+			try {
+				callback(keyPressEvent);
+			} catch (error) {
+				console.error('Error in keypress callback:', error);
 			}
 		};
 
-		// Start polling
-		checkKeyState().catch((error) => {
-			console.error('Key listener error:', error);
-		});
+		// Register the native listener
+		const unregister = registerKeyListener([keyCode], nativeCallback, { triggerOnce });
+
+		// Store the unregister function
+		activeListeners.set(listenerId, { abort: unregister } as any);
 
 		// Return cleanup function
 		return () => {
-			abortController.abort();
+			unregister();
 			activeListeners.delete(listenerId);
 		};
 	}
 
 	/**
 	 * Listen for all key presses and execute a callback for each.
+	 * Now uses native Windows hooks for better performance.
 	 * Returns a cleanup function to stop listening.
 	 */
 	public static getAllKeypresses(callback: (event: KeyPressEvent) => void, options: KeyListenerOptions = {}): () => void {
-		const { pollInterval = 10, triggerOnce = true } = options;
-
-		// Get all available keys
-		const allKeys = Array.from(stringToKeycode.keys()) as Key[];
+		const { triggerOnce = true } = options;
 
 		// Create abort controller for this listener group
 		const groupId = `all-keys-${Date.now()}`;
-		const abortController = new AbortController();
-		activeListeners.set(groupId, abortController);
 
-		// Track states for all keys
-		const localKeyStates = new Map<string, boolean>();
-		allKeys.forEach((key) => {
-			localKeyStates.set(key.toLowerCase(), false);
-		});
-
-		// Polling function
-		const checkAllKeys = async () => {
-			while (!abortController.signal.aborted) {
-				try {
-					// Check all keys in parallel for better performance
-					const keyChecks = allKeys.map(async (key) => {
-						try {
-							const isPressed = await Keyboard.isKeyPressed(key);
-							return { key, isPressed };
-						} catch {
-							// Ignore errors for individual keys
-							return { key, isPressed: false };
-						}
-					});
-
-					const results = await Promise.all(keyChecks);
-
-					// Process results
-					for (const { key, isPressed } of results) {
-						const keyStateId = key.toLowerCase();
-						const wasPressed = localKeyStates.get(keyStateId) ?? false;
-
-						// Detect key press transition
-						if (isPressed && (!wasPressed || !triggerOnce)) {
-							const keyCode = stringToKeycode.get(key.toLowerCase());
-							if (keyCode !== undefined) {
-								const event: KeyPressEvent = {
-									key,
-									keyCode,
-									timestamp: Date.now(),
-								};
-
-								// Call the callback
-								try {
-									callback(event);
-								} catch (error) {
-									console.error('Error in keypress callback:', error);
-								}
-							}
-						}
-
-						localKeyStates.set(keyStateId, isPressed);
-					}
-				} catch (error) {
-					console.error('Error checking all keys:', error);
+		// Wrap the native callback to match our interface
+		const nativeCallback = (event: NativeKeyEvent) => {
+			// Find the key name from the keycode
+			let keyName: Key | undefined;
+			for (const [key, code] of stringToKeycode.entries()) {
+				if (code === event.keyCode) {
+					keyName = key as Key;
+					break;
 				}
+			}
 
-				// Wait before next check
-				await new Promise<void>((resolve) => {
-					const timeout = setTimeout(resolve, pollInterval);
+			if (keyName) {
+				const keyPressEvent: KeyPressEvent = {
+					key: keyName,
+					keyCode: event.keyCode,
+					timestamp: event.timestamp,
+				};
 
-					// Clean up timeout if aborted
-					abortController.signal.addEventListener(
-						'abort',
-						() => {
-							clearTimeout(timeout);
-							resolve();
-						},
-						{ once: true }
-					);
-				});
+				try {
+					callback(keyPressEvent);
+				} catch (error) {
+					console.error('Error in keypress callback:', error);
+				}
 			}
 		};
 
-		// Start polling
-		checkAllKeys().catch((error) => {
-			console.error('All keys listener error:', error);
-		});
+		// Register the native listener for all keys (empty array)
+		const unregister = registerKeyListener([], nativeCallback, { triggerOnce });
+
+		// Store the unregister function
+		activeListeners.set(groupId, { abort: unregister } as any);
 
 		// Return cleanup function
 		return () => {
-			abortController.abort();
+			unregister();
 			activeListeners.delete(groupId);
 		};
 	}
@@ -572,9 +482,10 @@ export class Keyboard {
 	 * Stop all active keyboard listeners
 	 */
 	public static stopAllKeyboardListeners(): void {
-		activeListeners.forEach((controller) => {
-			controller.abort();
-		});
+		// Stop all native hooks
+		stopAllHooks();
+
+		// Clear our tracking map
 		activeListeners.clear();
 		keyStates.clear();
 	}
