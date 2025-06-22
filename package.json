@@ -23,11 +23,12 @@
 	"files": [
 		"src",
 		"dist",
+		"build/Release",
 		"!dist/**/*.map"
 	],
 	"scripts": {
-		"build": "node build-parallel.js",
-		"build:clean": "node build-parallel.js --clean",
+		"build": "bun run build-parallel.ts",
+		"build:clean": "bun run build-parallel.ts --clean",
 		"build:cpp": "node-gyp configure && node-gyp build",
 		"build:cpp:optimized": "node scripts/build-cpp-optimized.js",
 		"build:js": "tsup --config ./.config/tsup.config.ts",

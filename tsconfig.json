@@ -34,5 +34,5 @@
 			"@testUtils/*": ["testUtils/*"]
 		}
 	},
-	"exclude": ["build.ts", "dist", "temp"]
+	"exclude": ["dist", "temp"]
 }

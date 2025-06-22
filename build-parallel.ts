@@ -108,7 +108,7 @@ async function copyNativeBindings(): Promise<void> {
 
 async function checkCppBuildCache(): Promise<boolean> {
 	// Check if we need to rebuild C++ by comparing source file timestamps with built files
-	const cppFiles = ['src/cpp/clipboard.cpp', 'src/cpp/screen.cpp', 'src/cpp/keyboard.cpp', 'src/cpp/mouse.cpp', 'src/cpp/misc.cpp', 'src/cpp/screenRaw.cpp', 'src/cpp/panicShutdown.cpp'];
+	const cppFiles = ['src/cpp/clipboard.cpp', 'src/cpp/screen.cpp', 'src/cpp/keyboard.cpp', 'src/cpp/keyboardSync.cpp', 'src/cpp/mouse.cpp', 'src/cpp/misc.cpp', 'src/cpp/screenRaw.cpp', 'src/cpp/panicShutdown.cpp'];
 
 	const bindingGyp = 'binding.gyp';
 	const buildDir = 'build/Release';

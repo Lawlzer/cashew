@@ -506,6 +506,11 @@ export const panicShutdownSchema = v.object({
 	enablePanicShutdown: functionSchema,
 });
 
+export const keyboardHooksSchema = v.object({
+	registerKeyListener: functionSchema,
+	stopAllKeyboardHooks: functionSchema,
+});
+
 // Create a typed binding loader that validates at runtime
 export function loadBinding<T>(bindingName: string, schema: v.GenericSchema<T>): T {
 	const rawBinding = loadNativeBinding(bindingName);
@@ -522,17 +527,35 @@ export function loadBinding<T>(bindingName: string, schema: v.GenericSchema<T>):
 	const binding = result.output as any;
 	const proxiedBinding: any = {};
 
+	// List of functions that should NOT be wrapped as async
+	// These functions return synchronous values like cleanup functions
+	const syncFunctions = ['registerKeyListener'];
+
 	for (const [key, value] of Object.entries(binding)) {
 		if (typeof value === 'function') {
-			proxiedBinding[key] = async (...args: any[]): Promise<any> => {
-				try {
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-return
-					return await value(...args);
-				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
-					throwError(`${bindingName}.${key} failed: ${message}`);
-				}
-			};
+			if (syncFunctions.includes(key)) {
+				// Keep synchronous functions as-is, just add error handling
+				proxiedBinding[key] = (...args: any[]): any => {
+					try {
+						// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+						return value(...args);
+					} catch (error) {
+						const message = error instanceof Error ? error.message : String(error);
+						throwError(`${bindingName}.${key} failed: ${message}`);
+					}
+				};
+			} else {
+				// Wrap other functions as async
+				proxiedBinding[key] = async (...args: any[]): Promise<any> => {
+					try {
+						// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+						return await value(...args);
+					} catch (error) {
+						const message = error instanceof Error ? error.message : String(error);
+						throwError(`${bindingName}.${key} failed: ${message}`);
+					}
+				};
+			}
 		} else {
 			proxiedBinding[key] = value;
 		}
@@ -584,4 +607,9 @@ export interface ScreenRawBinding {
 
 export interface PanicShutdownBinding {
 	enablePanicShutdown: (keyCode: number, keyName: string) => Promise<boolean>;
+}
+
+export interface KeyboardHooksBinding {
+	registerKeyListener: (keyCodes: number[], callback: (event: { keyCode: number; timestamp: number }) => void, options: { triggerOnce: boolean }) => () => void;
+	stopAllKeyboardHooks: () => void;
 }
