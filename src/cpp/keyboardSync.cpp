@@ -2,10 +2,7 @@
 #include <napi.h>
 #include <windows.h>
 #include <vector>
-#include <chrono>
 #include <unordered_map>
-
-#pragma comment(lib, "winmm.lib") // Link against Windows multimedia library
 
 using namespace cashew;
 
@@ -165,37 +162,6 @@ Napi::Value IsKeyPressedAlt(const Napi::CallbackInfo& info) {
     return Napi::Boolean::New(env, isPressed);
 }
 
-// High-resolution sleep using Windows multimedia timer
-Napi::Value PreciseSleep(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-
-    if (info.Length() < 1 || !info[0].IsNumber()) {
-        Napi::Error::New(env, "Duration in microseconds must be a number").ThrowAsJavaScriptException();
-        return env.Null();
-    }
-
-    int microseconds = info[0].As<Napi::Number>().Int32Value();
-    
-    if (microseconds > 0) {
-        // For very short delays, use a spin-wait
-        if (microseconds < 1000) { // Less than 1ms
-            auto start = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::microseconds(microseconds);
-            while (std::chrono::high_resolution_clock::now() - start < duration) {
-                // Spin-wait for precise timing
-                YieldProcessor(); // CPU hint to reduce power consumption
-            }
-        } else {
-            // For longer delays, use Sleep with timeBeginPeriod for better precision
-            timeBeginPeriod(1); // Set timer resolution to 1ms
-            Sleep(microseconds / 1000);
-            timeEndPeriod(1);
-        }
-    }
-    
-    return env.Undefined();
-}
-
 // Batch send multiple key events efficiently
 Napi::Value SendKeyBatch(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
@@ -252,7 +218,6 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("isKeyPressedSync", Napi::Function::New(env, IsKeyPressedSync));
     exports.Set("areKeysPressed", Napi::Function::New(env, AreKeysPressed));
     exports.Set("getPressedKeys", Napi::Function::New(env, GetPressedKeys));
-    exports.Set("preciseSleep", Napi::Function::New(env, PreciseSleep));
     exports.Set("sendKeyBatch", Napi::Function::New(env, SendKeyBatch));
     exports.Set("getRawKeyState", Napi::Function::New(env, GetRawKeyState));
     exports.Set("isKeyPressedAlt", Napi::Function::New(env, IsKeyPressedAlt));

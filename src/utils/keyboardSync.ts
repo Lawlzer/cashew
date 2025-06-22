@@ -62,7 +62,6 @@ export const keyboardSyncSchema = v.object({
 	isKeyPressedSync: v.any(),
 	areKeysPressed: v.any(),
 	getPressedKeys: v.any(),
-	preciseSleep: v.any(),
 	sendKeyBatch: v.any(),
 	getRawKeyState: v.any(),
 	isKeyPressedAlt: v.any(),
@@ -72,7 +71,6 @@ export interface KeyboardSyncBinding {
 	isKeyPressedSync: (keyCode: number) => boolean;
 	areKeysPressed: (keyCodes: number[]) => boolean[];
 	getPressedKeys: () => number[];
-	preciseSleep: (microseconds: number) => void;
 	sendKeyBatch: (events: { keyCode: number; isDown: boolean }[]) => boolean;
 	getRawKeyState: (keyCode: number) => {
 		asyncState: number;
@@ -128,24 +126,6 @@ export class KeyboardSync {
 	 */
 	public static getPressedKeys(): number[] {
 		return keyboardSyncBinding.getPressedKeys();
-	}
-
-	/**
-	 * High-precision sleep function using spin-wait for microsecond precision
-	 * For delays < 1ms, uses CPU spin-wait (higher CPU usage but more precise)
-	 * For delays >= 1ms, uses system timer
-	 * @param microseconds - Sleep duration in microseconds (1000 microseconds = 1 millisecond)
-	 */
-	public static preciseSleep(microseconds: number): void {
-		keyboardSyncBinding.preciseSleep(Math.floor(microseconds));
-	}
-
-	/**
-	 * High-precision sleep function using milliseconds
-	 * Converts to microseconds internally
-	 */
-	public static preciseSleepMs(milliseconds: number): void {
-		keyboardSyncBinding.preciseSleep(Math.floor(milliseconds * 1000));
 	}
 
 	/**
@@ -213,12 +193,3 @@ export class KeyboardSync {
 		return () => keyboardSyncBinding.areKeysPressed(keyCodes);
 	}
 }
-
-// Re-export the precise timing function for easy access
-export const preciseSleep = (microseconds: number): void => {
-	KeyboardSync.preciseSleep(microseconds);
-};
-
-export const preciseSleepMs = (milliseconds: number): void => {
-	KeyboardSync.preciseSleepMs(milliseconds);
-};

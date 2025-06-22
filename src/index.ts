@@ -17,7 +17,7 @@ export { Clipboard } from './utils/clipboard';
 export { Config } from './utils/config';
 export type { Key } from './utils/keyboard';
 export { Keyboard } from './utils/keyboard';
-export { KeyboardSync, preciseSleep, preciseSleepMs } from './utils/keyboardSync';
+export { KeyboardSync } from './utils/keyboardSync';
 export { getForegroundWindowTitle, handlePanicShutdown, initToggleMonitor, setForegroundWindow } from './utils/misc';
 export { Mouse } from './utils/mouse';
 export { Ocr } from './utils/ocr';
