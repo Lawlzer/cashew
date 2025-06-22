@@ -30,6 +30,10 @@
            'sources': [ 'src/cpp/keyboard.cpp' ]
        },
        {
+           'target_name': 'keyboardSync',
+           'sources': [ 'src/cpp/keyboardSync.cpp' ]
+       },
+       {
            'target_name': 'mouse',
            'sources': [ 'src/cpp/mouse.cpp' ]
        },
@@ -47,6 +51,10 @@
        {
            'target_name': 'panicShutdown',
            'sources': [ 'src/cpp/panicShutdown.cpp' ]
+       },
+       {
+           'target_name': 'keyboardHooks',
+           'sources': [ 'src/cpp/keyboardHooks.cpp' ]
        }
    ]
 }
