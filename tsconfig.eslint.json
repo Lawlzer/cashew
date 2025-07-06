@@ -1,6 +1,6 @@
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {},
-	"include": ["./src", "./.config", "./test-utils", "./test", "./examples", "./.config/tsup.config.ts", "./build-parallel.ts"],
+	"include": ["./src", "./.config", "./test-utils", "./test", "./examples", "./.config/tsup.config.ts", "./build-parallel.ts", "./test.ts"],
 	"exclude": []
 }
