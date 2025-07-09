@@ -1,0 +1,6 @@
+{
+	"permissions": {
+		"allow": ["Bash(npm run build:cpp:*)", "Bash(bun run:*)", "Bash(node-gyp:*)", "Bash(rg:*)", "Bash(cp:*)", "Bash(rm:*)", "Bash(ls:*)", "Bash(npm run build:*)"],
+		"deny": []
+	}
+}

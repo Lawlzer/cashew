@@ -78,4 +78,16 @@ export class Mouse {
 		const useRawInput = options.useRawInput ?? false;
 		await mouseBinding.moveRelativePolar(options.angle, options.distance, smoothDuration, useRawInput);
 	}
+
+	/**
+	 * Set mouse position to absolute screen coordinates
+	 * @param position Target position {x, y}
+	 * @param smoothDuration Optional duration in milliseconds for smooth movement (0 = instant)
+	 * @param windowTitle Optional window title for client coordinate conversion
+	 */
+	public static async setPosition(options: { position: Position; smoothDuration?: number; windowTitle?: string }): Promise<void> {
+		const smoothDuration = options.smoothDuration ?? 0;
+		const windowTitle = options.windowTitle ?? '';
+		await mouseBinding.setPosition(options.position.x, options.position.y, smoothDuration, windowTitle);
+	}
 }

@@ -79,6 +79,91 @@ public:
     }
 };
 
+// Template for simple async operations that return a value
+template<typename ResultType>
+class SimpleAsyncWorker : public BaseAsyncWorker<ResultType> {
+private:
+    std::function<ResultType()> operation_;
+    ResultType result_;
+    
+public:
+    SimpleAsyncWorker(const Napi::Env& env, std::function<ResultType()> operation)
+        : BaseAsyncWorker<ResultType>(env), operation_(std::move(operation)) {}
+    
+    void Execute() override {
+        try {
+            result_ = operation_();
+        } catch (const std::exception& e) {
+            this->SetError(e.what());
+        } catch (...) {
+            this->SetError("Unknown error occurred");
+        }
+    }
+    
+    void OnOK() override {
+        Napi::HandleScope scope(this->Env());
+        this->deferred_.Resolve(ConvertToNapi(this->Env(), result_));
+    }
+    
+private:
+    // Helper to convert C++ types to Napi types
+    Napi::Value ConvertToNapi(const Napi::Env& env, bool value) {
+        return Napi::Boolean::New(env, value);
+    }
+    
+    Napi::Value ConvertToNapi(const Napi::Env& env, int value) {
+        return Napi::Number::New(env, value);
+    }
+    
+    Napi::Value ConvertToNapi(const Napi::Env& env, const std::string& value) {
+        return Napi::String::New(env, value);
+    }
+    
+    // Add more conversions as needed
+};
+
+// Template for simple async operations that return void
+template<>
+class SimpleAsyncWorker<void> : public BaseAsyncWorker<void> {
+private:
+    std::function<void()> operation_;
+    
+public:
+    SimpleAsyncWorker(const Napi::Env& env, std::function<void()> operation)
+        : BaseAsyncWorker<void>(env), operation_(std::move(operation)) {}
+    
+    void Execute() override {
+        try {
+            operation_();
+        } catch (const std::exception& e) {
+            SetError(e.what());
+        } catch (...) {
+            SetError("Unknown error occurred");
+        }
+    }
+};
+
+// Simplified API wrapping macros
+#define CASHEW_ASYNC_METHOD(name, operation) \
+    Napi::Value name(const Napi::CallbackInfo& info) { \
+        auto worker = new SimpleAsyncWorker<decltype(operation())>( \
+            info.Env(), \
+            [=]() { return operation(); } \
+        ); \
+        worker->Queue(); \
+        return worker->GetPromise(); \
+    }
+
+#define CASHEW_ASYNC_METHOD_VOID(name, operation) \
+    Napi::Value name(const Napi::CallbackInfo& info) { \
+        auto worker = new SimpleAsyncWorker<void>( \
+            info.Env(), \
+            [=]() { operation(); } \
+        ); \
+        worker->Queue(); \
+        return worker->GetPromise(); \
+    }
+
 // RAII wrapper for HDC
 class DcHandle {
 private:

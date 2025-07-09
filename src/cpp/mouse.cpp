@@ -509,6 +509,88 @@ private:
     bool useRawInput_;
 };
 
+// AsyncWorker for SetPosition
+class SetPositionWorker : public Napi::AsyncWorker {
+public:
+    SetPositionWorker(const Napi::Env& env,
+                     int x, int y,
+                     int smoothDuration,
+                     const std::string& windowTitle)
+        : Napi::AsyncWorker(env),
+          x_(x), y_(y),
+          smoothDuration_(smoothDuration),
+          windowTitle_(windowTitle) {}
+
+    void Execute() override {
+        HWND targetHwnd = NULL;
+        POINT screenPos = {x_, y_};
+
+        // Check for window title
+        if (!windowTitle_.empty()) {
+            targetHwnd = FindWindowA(NULL, windowTitle_.c_str());
+            if (!targetHwnd) {
+                SetError("Window not found: " + windowTitle_);
+                return;
+            }
+            
+            // Convert client coordinates to screen coordinates
+            POINT clientPt = {x_, y_};
+            if (ClientToScreen(targetHwnd, &clientPt)) {
+                screenPos = clientPt;
+            }
+        }
+
+        if (smoothDuration_ < 0) smoothDuration_ = 0;
+
+        if (smoothDuration_ <= 0) {
+            // Instant movement
+            SetCursorPos(screenPos.x, screenPos.y);
+        } else {
+            // Get current cursor position for smooth movement
+            POINT currentPos;
+            if (!GetCursorPos(&currentPos)) {
+                SetError("Failed to get current cursor position");
+                return;
+            }
+
+            // Smooth interpolation
+            int steps = std::max(smoothDuration_ / 5, 1); // 5ms per step minimum
+            double stepDelay = static_cast<double>(smoothDuration_) / steps;
+            
+            for (int i = 1; i <= steps; i++) {
+                double progress = static_cast<double>(i) / steps;
+                double easedProgress = easeInOutCubic(progress);
+                
+                int newX = static_cast<int>(currentPos.x + (screenPos.x - currentPos.x) * easedProgress);
+                int newY = static_cast<int>(currentPos.y + (screenPos.y - currentPos.y) * easedProgress);
+                
+                SetCursorPos(newX, newY);
+                
+                if (i < steps) {
+                    std::this_thread::sleep_for(std::chrono::microseconds(static_cast<int>(stepDelay * 1000)));
+                }
+            }
+        }
+    }
+
+    void OnOK() override {
+        Napi::HandleScope scope(Env());
+        deferred_.Resolve(Env().Undefined());
+    }
+
+    void OnError(const Napi::Error& error) override {
+        deferred_.Reject(error.Value());
+    }
+
+    Napi::Promise GetPromise() { return deferred_.Promise(); }
+
+private:
+    Napi::Promise::Deferred deferred_ = Napi::Promise::Deferred::New(Env());
+    int x_, y_;
+    int smoothDuration_;
+    std::string windowTitle_;
+};
+
 /**
  * Windows doesn't seem to allow you to click on background applications, without bringing them to the foregorund first.
  * Merged click logic directly into Napi function.
@@ -705,6 +787,42 @@ Napi::Value moveRelativePolar(const Napi::CallbackInfo& info) {
     return worker->GetPromise();
 }
 
+// Function to set mouse position to absolute coordinates
+Napi::Value setPosition(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    // Expected args: x(num), y(num), smoothDuration(num), windowTitle(str|null|undef)
+    if (info.Length() < 3 || info.Length() > 4) {
+        Napi::Error::New(env, "Expected 3 or 4 arguments: x, y, smoothDuration, [windowTitle]").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+    if (!info[0].IsNumber() || !info[1].IsNumber() || !info[2].IsNumber()) {
+        Napi::Error::New(env, "Invalid argument types. Expected: number, number, number, [string]").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    // Validate windowTitle (optional arg 4)
+    bool titleOk = info.Length() < 4 || info[3].IsString() || info[3].IsNull() || info[3].IsUndefined();
+    if (!titleOk) {
+        Napi::Error::New(env, "windowTitle must be a string, null, or undefined").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    int x = info[0].As<Napi::Number>().Int32Value();
+    int y = info[1].As<Napi::Number>().Int32Value();
+    int smoothDuration = info[2].As<Napi::Number>().Int32Value();
+    std::string windowTitle = "";
+
+    // Check for windowTitle (arg 4)
+    if (info.Length() == 4 && info[3].IsString()) {
+        windowTitle = info[3].As<Napi::String>().Utf8Value();
+    }
+
+    auto* worker = new SetPositionWorker(env, x, y, smoothDuration, windowTitle);
+    worker->Queue();
+    return worker->GetPromise();
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "clickMessage"), Napi::Function::New(env, clickMessageNapi));
     exports.Set(Napi::String::New(env, "getPosition"), Napi::Function::New(env, getPosition));
@@ -713,6 +831,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "click"), Napi::Function::New(env, clickNapi)); // Renamed export
     exports.Set(Napi::String::New(env, "moveRelative"), Napi::Function::New(env, moveRelative));
     exports.Set(Napi::String::New(env, "moveRelativePolar"), Napi::Function::New(env, moveRelativePolar));
+    exports.Set(Napi::String::New(env, "setPosition"), Napi::Function::New(env, setPosition));
     return exports;
 }
 
