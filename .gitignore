@@ -63,3 +63,5 @@ build-parallel.js
 build-parallel.d.ts
 .tsconfig.incremental.json
 
+.grepai/
+.ai

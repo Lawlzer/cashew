@@ -218,6 +218,15 @@ export const keyboardHooksSchema = v.object({
 	stopAllKeyboardHooks: functionSchema,
 });
 
+export const keyboardSyncSchema = v.object({
+	isKeyPressedSync: functionSchema,
+	areKeysPressed: functionSchema,
+	getPressedKeys: functionSchema,
+	sendKeyBatch: functionSchema,
+	getRawKeyState: functionSchema,
+	isKeyPressedAlt: functionSchema,
+});
+
 // Create a typed binding loader that validates at runtime
 export function loadBinding<T>(bindingName: string, schema: v.GenericSchema<T>): T {
 	const rawBinding = loadNativeBinding(bindingName);
@@ -236,7 +245,7 @@ export function loadBinding<T>(bindingName: string, schema: v.GenericSchema<T>):
 
 	// List of functions that should NOT be wrapped as async
 	// These functions return synchronous values like cleanup functions
-	const syncFunctions = ['registerKeyListener', 'stopAllHoldKeys'];
+	const syncFunctions = ['registerKeyListener', 'stopAllHoldKeys', 'isKeyPressedSync', 'areKeysPressed', 'getPressedKeys', 'sendKeyBatch', 'getRawKeyState', 'isKeyPressedAlt'];
 
 	for (const [key, value] of Object.entries(binding)) {
 		if (typeof value === 'function') {
@@ -323,4 +332,20 @@ export interface PanicShutdownBinding {
 export interface KeyboardHooksBinding {
 	registerKeyListener: (keyCodes: number[], callback: (event: { keyCode: number; timestamp: number }) => void, options: { triggerOnce: boolean }) => () => void;
 	stopAllKeyboardHooks: () => void;
+}
+
+export interface KeyboardSyncBinding {
+	isKeyPressedSync: (keyCode: number) => boolean;
+	areKeysPressed: (keyCodes: number[]) => boolean[];
+	getPressedKeys: () => number[];
+	sendKeyBatch: (events: { keyCode: number; isDown: boolean }[]) => boolean;
+	getRawKeyState: (keyCode: number) => {
+		asyncState: number;
+		asyncStateHex: string;
+		isPressed: boolean;
+		wasPressed: boolean;
+		keyboardState: number;
+		kbStatePressed: boolean;
+	};
+	isKeyPressedAlt: (keyCode: number) => boolean;
 }

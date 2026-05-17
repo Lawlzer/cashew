@@ -325,7 +325,7 @@ async function buildAll(): Promise<void> {
 		if (totalTime > 10) {
 			console.info(`\n${colors.yellow}💡 Tip: Use --clean sparingly to benefit from build caching${colors.reset}`);
 		}
-	} catch (error) {
+	} catch (_error) {
 		totalTimer.end(false);
 		console.error(`\n${colors.bright}${colors.red}💥 Build failed!${colors.reset}`);
 		process.exit(1);

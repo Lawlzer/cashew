@@ -2,7 +2,10 @@ import { throwError } from '@lawlzer/utils';
 
 import { type KeyboardBinding, keyboardSchema, loadBinding } from './bindingLoader';
 import { Config } from './config';
-import { type NativeKeyEvent, registerKeyListener, stopAllKeyboardHooks as stopAllHooks } from './keyboardHooks';
+import { type KeyListenerOptions, type NativeKeyEvent, registerKeyListener, stopAllKeyboardHooks as stopAllHooks } from './keyboardHooks';
+
+// Re-export KeyListenerOptions for backward compatibility
+export type { KeyListenerOptions };
 
 // Load binding
 const keyboardBinding = loadBinding<KeyboardBinding>('keyboard', keyboardSchema);
@@ -14,19 +17,7 @@ export interface KeyPressEvent {
 	timestamp: number;
 }
 
-export interface KeyListenerOptions {
-	/**
-	 * If true, the callback will only fire once per key press
-	 * (requires the key to be released before firing again)
-	 * @default true
-	 */
-	triggerOnce?: boolean;
-}
-
-// Track key states to detect press/release transitions (kept for compatibility)
-const keyStates = new Map<string, boolean>();
-
-// Active listeners - now stores unregister functions
+// Active listeners - stores unregister functions
 const activeListeners = new Map<string, { abort: () => void }>();
 
 // Single source of truth for key mappings
@@ -50,17 +41,23 @@ const keyMappings = {
 
 	// Navigation keys
 	pageup: 0x21,
+	pageUp: 0x21,
 	pagedown: 0x22,
+	pageDown: 0x22,
 	end: 0x23,
 	home: 0x24,
 	left: 0x25,
 	leftarrow: 0x25,
+	leftArrow: 0x25,
 	up: 0x26,
 	uparrow: 0x26,
+	upArrow: 0x26,
 	right: 0x27,
 	rightarrow: 0x27,
+	rightArrow: 0x27,
 	down: 0x28,
 	downarrow: 0x28,
+	downArrow: 0x28,
 
 	// Edit keys
 	insert: 0x2d,
@@ -129,40 +126,70 @@ const keyMappings = {
 
 	// Function keys
 	f1: 0x70,
+	F1: 0x70,
 	f2: 0x71,
+	F2: 0x71,
 	f3: 0x72,
+	F3: 0x72,
 	f4: 0x73,
+	F4: 0x73,
 	f5: 0x74,
+	F5: 0x74,
 	f6: 0x75,
+	F6: 0x75,
 	f7: 0x76,
+	F7: 0x76,
 	f8: 0x77,
+	F8: 0x77,
 	f9: 0x78,
+	F9: 0x78,
 	f10: 0x79,
+	F10: 0x79,
 	f11: 0x7a,
+	F11: 0x7a,
 	f12: 0x7b,
+	F12: 0x7b,
 	f13: 0x7c,
+	F13: 0x7c,
 	f14: 0x7d,
+	F14: 0x7d,
 	f15: 0x7e,
+	F15: 0x7e,
 	f16: 0x7f,
+	F16: 0x7f,
 	f17: 0x80,
+	F17: 0x80,
 	f18: 0x81,
+	F18: 0x81,
 	f19: 0x82,
+	F19: 0x82,
 	f20: 0x83,
+	F20: 0x83,
 	f21: 0x84,
+	F21: 0x84,
 	f22: 0x85,
+	F22: 0x85,
 	f23: 0x86,
+	F23: 0x86,
 	f24: 0x87,
+	F24: 0x87,
 
 	// Lock keys
 	caps_lock: 0x14,
 
 	// Modifier keys
 	leftshift: 0xa0,
+	leftShift: 0xa0,
 	rightshift: 0xa1,
+	rightShift: 0xa1,
 	leftcontrol: 0xa2,
+	leftControl: 0xa2,
 	rightcontrol: 0xa3,
+	rightControl: 0xa3,
 	leftalt: 0xa4,
+	leftAlt: 0xa4,
 	rightalt: 0xa5,
+	rightAlt: 0xa5,
 
 	// Media keys
 	volumemute: 0xad,
@@ -199,6 +226,14 @@ const keyMappings = {
 
 // Create the stringToKeycode map with normalized keys
 export const stringToKeycode = new Map<string, number>(Object.entries(keyMappings).map(([key, value]) => [key.toLowerCase(), value]));
+
+// Reverse map: keycode → canonical key name (first mapping wins)
+const keycodeToString = new Map<number, Key>();
+for (const [key, code] of stringToKeycode.entries()) {
+	if (!keycodeToString.has(code)) {
+		keycodeToString.set(code, key as Key);
+	}
+}
 
 // Type for valid keys (using the keys from our mapping)
 export type Key = keyof typeof keyMappings;
@@ -267,6 +302,13 @@ export class Keyboard {
 
 		const realWindowTitle = windowTitle ?? Config.windowTitle ?? '';
 		await keyboardBinding.releaseKey(keyCode, realWindowTitle);
+	}
+
+	/**
+	 * @deprecated Use releaseKey instead.
+	 */
+	public static async releaseKeyDesktop(inputKey: Key): Promise<void> {
+		await this.releaseKey(inputKey);
 	}
 
 	/**
@@ -356,7 +398,7 @@ export class Keyboard {
 		const listenerId = `${key}-${Date.now()}-${Math.random()}`;
 
 		// Wrap the native callback to match our interface
-		const nativeCallback = (event: NativeKeyEvent) => {
+		const nativeCallback = (event: NativeKeyEvent): void => {
 			const keyPressEvent: KeyPressEvent = {
 				key,
 				keyCode: event.keyCode,
@@ -374,10 +416,10 @@ export class Keyboard {
 		const unregister = registerKeyListener([keyCode], nativeCallback, { triggerOnce });
 
 		// Store the unregister function
-		activeListeners.set(listenerId, { abort: unregister } as any);
+		activeListeners.set(listenerId, { abort: unregister });
 
 		// Return cleanup function
-		return () => {
+		return (): void => {
 			unregister();
 			activeListeners.delete(listenerId);
 		};
@@ -395,15 +437,9 @@ export class Keyboard {
 		const groupId = `all-keys-${Date.now()}`;
 
 		// Wrap the native callback to match our interface
-		const nativeCallback = (event: NativeKeyEvent) => {
+		const nativeCallback = (event: NativeKeyEvent): void => {
 			// Find the key name from the keycode
-			let keyName: Key | undefined;
-			for (const [key, code] of stringToKeycode.entries()) {
-				if (code === event.keyCode) {
-					keyName = key as Key;
-					break;
-				}
-			}
+			const keyName = keycodeToString.get(event.keyCode);
 
 			if (keyName) {
 				const keyPressEvent: KeyPressEvent = {
@@ -424,10 +460,10 @@ export class Keyboard {
 		const unregister = registerKeyListener([], nativeCallback, { triggerOnce });
 
 		// Store the unregister function
-		activeListeners.set(groupId, { abort: unregister } as any);
+		activeListeners.set(groupId, { abort: unregister });
 
 		// Return cleanup function
-		return () => {
+		return (): void => {
 			unregister();
 			activeListeners.delete(groupId);
 		};
@@ -442,7 +478,6 @@ export class Keyboard {
 
 		// Clear our tracking map
 		activeListeners.clear();
-		keyStates.clear();
 	}
 
 	/**

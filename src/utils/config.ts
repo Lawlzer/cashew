@@ -14,6 +14,13 @@ class ConfigManager {
 		this.config = { ...this.config, ...newConfig };
 	}
 
+	/**
+	 * @deprecated Use update instead.
+	 */
+	public setProcessConfig(newConfig: Partial<ProcessConfig>): void {
+		this.update(newConfig);
+	}
+
 	public get(): Readonly<ProcessConfig> {
 		return this.config;
 	}

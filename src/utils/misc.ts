@@ -28,7 +28,7 @@ export interface Position {
  * Returns a random number between min and max, with a bell curve distribution.
  * @param iterations - The number of iterations to run. (Higher = more accurate bell curve, 1 = no bell curve)
  */
-export function randomBellCurve(min: number, max: number, iterations = 5) {
+export function randomBellCurve(min: number, max: number, iterations = 5): number {
 	const range = max - min;
 
 	let total = 0;
@@ -44,7 +44,7 @@ export function randomBellCurve(min: number, max: number, iterations = 5) {
 	return min + Math.floor(value * range);
 }
 
-export async function handlePanicShutdown(keyToShutdownOn: Key) {
+export async function handlePanicShutdown(keyToShutdownOn: Key): Promise<void> {
 	// Convert the key to a keycode using the unified mapping
 	const keyCode = stringToKeycode.get(keyToShutdownOn.toLowerCase());
 	if (keyCode === undefined) {
@@ -65,7 +65,7 @@ export async function handlePanicShutdown(keyToShutdownOn: Key) {
 /**
  * Determine if two RGB values are close enough (within a certain offset)
  */
-export function isCorrectColour(pixel1: rgb, pixel2: rgb, maxOffset: number) {
+export function isCorrectColour(pixel1: rgb, pixel2: rgb, maxOffset: number): boolean {
 	const rOffset = Math.abs(pixel1.r - pixel2.r);
 	const gOffset = Math.abs(pixel1.g - pixel2.g);
 	const bOffset = Math.abs(pixel1.b - pixel2.b);
@@ -121,7 +121,7 @@ export function initToggleMonitor({
 	onMessage = null,
 	offMessage = null,
 	initialState = false,
-	pollingInterval: _pollingInterval = 20, // This parameter is now ignored since we use native hooks
+	pollingInterval: _pollingInterval, // @deprecated — ignored, native hooks are used instead
 	postToggleDelayMs = 250,
 }: InitToggleMonitorParams): () => void {
 	let isActive = initialState;

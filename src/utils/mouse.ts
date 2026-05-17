@@ -25,16 +25,32 @@ export class Mouse {
 	/**
 	 * Standard click that moves mouse to position and clicks
 	 */
-	public static async click(options?: { button?: 'left' | 'right'; position?: Position; holdFor?: number; windowTitle?: string }): Promise<void> {
+	public static async click(options?: ClickOptions & { windowTitle?: string }): Promise<void> {
 		const button = options?.button ?? 'left';
 		const holdFor = options?.holdFor ?? 0;
 		const windowTitle = options?.windowTitle ?? Config.windowTitle ?? '';
+		const clickCount = options?.clickCount ?? 1;
+		const delayAfter = options?.delayAfter ?? 0;
 
 		// Pass null for x/y if no position specified
 		const x = options?.position?.x ?? null;
 		const y = options?.position?.y ?? null;
 
-		await mouseBinding.click(x, y, button, holdFor, windowTitle);
+		for (let i = 0; i < clickCount; i++) {
+			await mouseBinding.click(x, y, button, holdFor, windowTitle);
+			if (delayAfter > 0 && i < clickCount - 1) {
+				await new Promise<void>((resolve) => {
+					setTimeout(resolve, delayAfter);
+				});
+			}
+		}
+	}
+
+	/**
+	 * @deprecated Use click instead.
+	 */
+	public static async clickDesktop(options?: ClickOptions & { windowTitle?: string }): Promise<void> {
+		await this.click(options);
 	}
 
 	public static async getPosition(): Promise<Position> {

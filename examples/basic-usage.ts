@@ -7,7 +7,7 @@
 
 import { getForegroundWindowTitle, Keyboard, Mouse } from '../src/index';
 
-async function main() {
+async function main(): Promise<void> {
 	console.info('🎮 Cashew Basic Usage Example\n');
 
 	// Get current window title

@@ -5,14 +5,11 @@ import { Config } from './config';
 import { isCorrectColour, type Position } from './misc';
 
 // Lazy load sharp to avoid issues with Bun
-const sharpModule: any = null;
-let sharpLoadingPromise: Promise<any> | null = null;
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+type Sharp = typeof import('sharp');
+let sharpLoadingPromise: Promise<Sharp> | null = null;
 
-async function getSharp(): Promise<any> {
-	if (sharpModule) {
-		return sharpModule;
-	}
-
+async function getSharp(): Promise<Sharp> {
 	// If already loading, wait for the existing load to complete
 	if (sharpLoadingPromise) {
 		return sharpLoadingPromise;
@@ -27,8 +24,7 @@ async function getSharp(): Promise<any> {
 	sharpLoadingPromise = (async () => {
 		try {
 			const loadedModule = await dynamicImport('sharp');
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-return
-			return loadedModule.default || loadedModule;
+			return (loadedModule.default || loadedModule) as Sharp;
 		} catch (error) {
 			throwError(`Failed to load sharp module. Please install it with: npm install sharp\n${String(error)}`);
 		}

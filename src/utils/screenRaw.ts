@@ -16,18 +16,6 @@ export class ScreenRaw {
 	 * @returns Promise resolving to true if successful
 	 */
 	public static async setSquare(position: Position, size: { width: number; height: number }, color: rgb): Promise<boolean> {
-		if (typeof position.x !== 'number' || typeof position.y !== 'number') {
-			throwError('Position must have numeric x and y coordinates');
-		}
-
-		if (typeof size.width !== 'number' || typeof size.height !== 'number') {
-			throwError('Size must have numeric width and height values');
-		}
-
-		if (typeof color.r !== 'number' || typeof color.g !== 'number' || typeof color.b !== 'number') {
-			throwError('Color must have numeric r, g, and b values');
-		}
-
 		if (color.r < 0 || color.r > 255 || color.g < 0 || color.g > 255 || color.b < 0 || color.b > 255) {
 			throwError('RGB values must be between 0 and 255');
 		}

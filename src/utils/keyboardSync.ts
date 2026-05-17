@@ -1,90 +1,10 @@
 import { throwError } from '@lawlzer/utils';
-import * as path from 'path';
-import * as v from 'valibot';
 
+import { type KeyboardSyncBinding, keyboardSyncSchema, loadBinding } from './bindingLoader';
 import { type Key, stringToKeycode } from './keyboard';
 
-// Dynamic require function to avoid TypeScript issues with native bindings
-function dynamicRequire(moduleId: string): any {
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	return require(moduleId);
-}
-
-// Load the native binding directly without promise wrapping
-function loadKeyboardSyncBinding(): KeyboardSyncBinding {
-	const bindingName = 'keyboardSync.node';
-
-	// Build comprehensive list of paths to try
-	const cwd = process.cwd();
-	const paths = [
-		// Direct paths from dist
-		path.join(__dirname, '../../build/Release', bindingName),
-		path.join(__dirname, '../build/Release', bindingName),
-		path.join(__dirname, 'build/Release', bindingName),
-
-		// Paths relative to current working directory
-		path.join(cwd, 'dist/build/Release', bindingName),
-		path.join(cwd, 'build/Release', bindingName),
-
-		// When installed as dependency
-		path.join(cwd, 'node_modules/@lawlzer/cashew/dist/build/Release', bindingName),
-		path.join(cwd, 'node_modules/@lawlzer/cashew/build/Release', bindingName),
-	];
-
-	// Try to load from each path
-	for (const bindingPath of paths) {
-		try {
-			const binding = dynamicRequire(bindingPath);
-			// Quick validation
-			if (binding && typeof binding.isKeyPressedSync === 'function') {
-				return binding as KeyboardSyncBinding;
-			}
-		} catch {
-			// Try next path
-		}
-	}
-
-	// Last resort - try direct require
-	try {
-		const binding = dynamicRequire('keyboardSync');
-		if (binding && typeof binding.isKeyPressedSync === 'function') {
-			return binding as KeyboardSyncBinding;
-		}
-	} catch {
-		// Will throw below
-	}
-
-	throwError(`Could not load keyboardSync binding. Searched paths:\n${paths.map((p) => `  - ${p}`).join('\n')}`);
-}
-
-// Schema for synchronous keyboard binding
-export const keyboardSyncSchema = v.object({
-	isKeyPressedSync: v.any(),
-	areKeysPressed: v.any(),
-	getPressedKeys: v.any(),
-	sendKeyBatch: v.any(),
-	getRawKeyState: v.any(),
-	isKeyPressedAlt: v.any(),
-});
-
-export interface KeyboardSyncBinding {
-	isKeyPressedSync: (keyCode: number) => boolean;
-	areKeysPressed: (keyCodes: number[]) => boolean[];
-	getPressedKeys: () => number[];
-	sendKeyBatch: (events: { keyCode: number; isDown: boolean }[]) => boolean;
-	getRawKeyState: (keyCode: number) => {
-		asyncState: number;
-		asyncStateHex: string;
-		isPressed: boolean;
-		wasPressed: boolean;
-		keyboardState: number;
-		kbStatePressed: boolean;
-	};
-	isKeyPressedAlt: (keyCode: number) => boolean;
-}
-
-// Load the synchronous binding directly without promise wrapping
-const keyboardSyncBinding = loadKeyboardSyncBinding();
+// Load the synchronous binding using the shared loader infrastructure
+const keyboardSyncBinding = loadBinding<KeyboardSyncBinding>('keyboardSync', keyboardSyncSchema);
 
 export interface KeyBatchEvent {
 	keyCode: number;
