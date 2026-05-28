@@ -1,6 +1,6 @@
 import { throwError } from '@lawlzer/utils';
 
-import { type KeyboardBinding, keyboardSchema, loadBinding } from './bindingLoader';
+import { type KeyboardBinding, loadBinding } from './bindingLoader';
 import { Config } from './config';
 import { type KeyListenerOptions, type NativeKeyEvent, registerKeyListener, stopAllKeyboardHooks as stopAllHooks } from './keyboardHooks';
 
@@ -8,7 +8,7 @@ import { type KeyListenerOptions, type NativeKeyEvent, registerKeyListener, stop
 export type { KeyListenerOptions };
 
 // Load binding
-const keyboardBinding = loadBinding<KeyboardBinding>('keyboard', keyboardSchema);
+const keyboardBinding = loadBinding<KeyboardBinding>('keyboard');
 
 // Types for keyboard events
 export interface KeyPressEvent {

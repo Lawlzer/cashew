@@ -1,7 +1,7 @@
-import { type KeyboardHooksBinding, keyboardHooksSchema, loadBinding } from './bindingLoader';
+import { type KeyboardHooksBinding, loadBinding } from './bindingLoader';
 
 // Load binding
-const keyboardHooksBinding = loadBinding<KeyboardHooksBinding>('keyboardHooks', keyboardHooksSchema);
+const keyboardHooksBinding = loadBinding<KeyboardHooksBinding>('keyboardHooks');
 
 export interface NativeKeyEvent {
 	keyCode: number;

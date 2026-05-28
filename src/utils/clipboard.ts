@@ -1,9 +1,8 @@
 import { throwError } from '@lawlzer/utils';
 
-import { type ClipboardBinding, clipboardSchema, loadBinding } from './bindingLoader';
+import { type ClipboardBinding, loadBinding } from './bindingLoader';
 
-// Load the binding with the new Valibot-based loader
-const clipboardBinding = loadBinding<ClipboardBinding>('clipboard', clipboardSchema);
+const clipboardBinding = loadBinding<ClipboardBinding>('clipboard');
 
 export class Clipboard {
 	public static async write(text: string): Promise<void> {

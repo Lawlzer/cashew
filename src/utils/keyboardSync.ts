@@ -1,10 +1,10 @@
 import { throwError } from '@lawlzer/utils';
 
-import { type KeyboardSyncBinding, keyboardSyncSchema, loadBinding } from './bindingLoader';
+import { type KeyboardSyncBinding, loadBinding } from './bindingLoader';
 import { type Key, stringToKeycode } from './keyboard';
 
 // Load the synchronous binding using the shared loader infrastructure
-const keyboardSyncBinding = loadBinding<KeyboardSyncBinding>('keyboardSync', keyboardSyncSchema);
+const keyboardSyncBinding = loadBinding<KeyboardSyncBinding>('keyboardSync');
 
 export interface KeyBatchEvent {
 	keyCode: number;

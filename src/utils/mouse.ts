@@ -1,9 +1,9 @@
-import { loadBinding, type MouseBinding, mouseSchema } from './bindingLoader';
+import { loadBinding, type MouseBinding } from './bindingLoader';
 import { Config } from './config';
 import type { Position } from './misc';
 
 // Load binding
-const mouseBinding = loadBinding<MouseBinding>('mouse', mouseSchema);
+const mouseBinding = loadBinding<MouseBinding>('mouse');
 
 export interface ClickOptions {
 	button?: 'left' | 'right';

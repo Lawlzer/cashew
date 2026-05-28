@@ -6,7 +6,7 @@ This package provides utilities for automating keyboard, mouse, screen, OCR, and
 
 This package is built for maximum performance, and working on background windows/applications! This is _my_ dream package for macros.
 
-// No external dependencies, just pure magic. (that's a code-word for C++, mostly written by GPT 3.5 to 4o)
+// Native Windows automation is powered by Rust + napi-rs.
 
 // ONLY works on Windows! I do not use Linux/MacOS, so I'm not going to support them. You can make a PR, if you'd like :)
 

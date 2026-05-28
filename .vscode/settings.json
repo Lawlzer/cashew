@@ -22,19 +22,5 @@
 	"editor.codeActionsOnSave": {
 		"source.fixAll.eslint": "explicit",
 		"source.fixAll.format": "explicit"
-	},
-
-	// C/C++ IntelliSense
-	"C_Cpp.default.configurationProvider": "ms-vscode.cpptools",
-	"C_Cpp.errorSquiggles": "enabled",
-	"C_Cpp.intelliSenseEngine": "default",
-	"C_Cpp.intelliSenseEngineFallback": "enabled",
-	"C_Cpp.autocompleteAddParentheses": true,
-	"C_Cpp.default.cppStandard": "c++17",
-	"C_Cpp.default.cStandard": "c11",
-	"files.associations": {
-		"*.h": "cpp",
-		"*.hpp": "cpp",
-		"*.cpp": "cpp"
 	}
 }

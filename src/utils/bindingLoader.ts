@@ -1,49 +1,21 @@
 import { throwError } from '@lawlzer/utils';
 import * as path from 'path';
-import * as v from 'valibot';
 
-// Helper function to require modules dynamically
-function dynamicRequire(moduleId: string): any {
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	return require(moduleId);
-}
+type NativeFunction = (...args: unknown[]) => unknown;
+type NativeAddon = Record<string, unknown>;
 
-// Optimized directory resolution with caching
 const cachedPackageRoot = (() => {
 	let cached: string | null = null;
 
 	return (): string => {
 		if (cached !== null) return cached;
 
-		// Strategy 1: Direct resolution for installed packages
 		try {
 			const resolved = require.resolve('@lawlzer/cashew/package.json');
 			cached = path.dirname(resolved);
 			return cached;
 		} catch {
-			// Continue to fallback strategies
-		}
-
-		// Strategy 2: Search from current working directory
-		const searchPaths = [process.cwd(), path.dirname(process.argv[1] || process.cwd()), ...Array.from({ length: 5 }, (_, i) => path.join(process.cwd(), ...Array(i).fill('..'), 'node_modules', '@lawlzer', 'cashew'))];
-
-		try {
-			const fs = dynamicRequire('fs');
-			for (const searchPath of searchPaths) {
-				// Check for package.json to confirm it's our package
-				if (fs.existsSync(path.join(searchPath, 'package.json'))) {
-					// Verify it has our expected structure
-					const releaseDir = path.join(searchPath, 'dist', 'build', 'Release');
-					const fallbackDir = path.join(searchPath, 'build', 'Release');
-
-					if (fs.existsSync(releaseDir) || fs.existsSync(fallbackDir)) {
-						cached = searchPath;
-						return cached;
-					}
-				}
-			}
-		} catch {
-			// fs not available, use cwd as fallback
+			// Continue to local development fallbacks.
 		}
 
 		cached = process.cwd();
@@ -51,15 +23,10 @@ const cachedPackageRoot = (() => {
 	};
 })();
 
-// Create require function for both ESM and CJS with better Bun support
 function createRequireFunction(): NodeRequire {
-	// Bun-specific handling
 	if (typeof Bun !== 'undefined') {
-		if (typeof require !== 'undefined') {
-			return require;
-		}
+		if (typeof require !== 'undefined') return require;
 
-		// Create a Bun-compatible loader
 		const bunLoader = ((id: string) => {
 			if (id.endsWith('.node')) {
 				const mod = { exports: {} };
@@ -67,23 +34,23 @@ function createRequireFunction(): NodeRequire {
 				return mod.exports;
 			}
 			throw new Error(`Cannot require ${id} in Bun without require`);
-		}) as any;
+		}) as NodeRequire;
 
-		bunLoader.resolve = (id: string) => id;
-		return bunLoader as NodeRequire;
+		const resolve = ((id: string) => id) as NodeRequire['resolve'];
+		resolve.paths = () => [];
+		bunLoader.resolve = resolve;
+		return bunLoader;
 	}
 
-	// Standard Node.js require
 	try {
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval
 		const getRequire = new Function('return typeof require !== "undefined" ? require : null;');
 		const req = getRequire() as NodeRequire | null;
 		if (req) return req;
 	} catch {
-		// Fall through
+		// Fall through to process.dlopen loader.
 	}
 
-	// Fallback loader using process.dlopen
 	const fallbackLoader = ((id: string) => {
 		if (id.endsWith('.node') && process.dlopen !== undefined) {
 			const mod = { exports: {} };
@@ -91,196 +58,189 @@ function createRequireFunction(): NodeRequire {
 			return mod.exports;
 		}
 		throw new Error(`Cannot load module ${id} - require not available`);
-	}) as any;
+	}) as NodeRequire;
 
-	fallbackLoader.resolve = (id: string) => {
+	const resolve = ((id: string) => {
 		throw new Error(`Cannot resolve ${id} - require not available`);
-	};
+	}) as unknown as NodeRequire['resolve'];
+	resolve.paths = () => [];
+	fallbackLoader.resolve = resolve;
 
-	return fallbackLoader as NodeRequire;
+	return fallbackLoader;
 }
 
 const requireFunction = createRequireFunction();
 
-// Optimized native binding loader
-function loadNativeBinding(name: string): unknown {
-	const bindingName = `${name}.node`;
+function currentPlatformTriples(): string[] {
+	if (process.platform === 'win32') {
+		if (process.arch === 'x64') return ['win32-x64-msvc'];
+		if (process.arch === 'arm64') return ['win32-arm64-msvc'];
+	}
+
+	return [`${process.platform}-${process.arch}`];
+}
+
+function nativeFileNames(): string[] {
+	return ['cashew.node', ...currentPlatformTriples().map((triple) => `cashew.${triple}.node`)];
+}
+
+function optionalNativePackages(): string[] {
+	return currentPlatformTriples().map((triple) => `@lawlzer/cashew-${triple}`);
+}
+
+function candidateNativePaths(): string[] {
 	const packageRoot = cachedPackageRoot();
+	const roots = [packageRoot, process.cwd(), path.join(process.cwd(), 'node_modules', '@lawlzer', 'cashew')];
+	const relativeDirs = ['', 'dist', path.join('build', 'Release'), path.join('dist', 'build', 'Release')];
+	const paths: string[] = [];
 
-	// Build prioritized path list
-	const paths = [
-		// Direct attempts
-		name,
-		bindingName,
-
-		// Package-relative paths (prioritize dist/build/Release for installed packages)
-		path.join(packageRoot, 'dist', 'build', 'Release', bindingName),
-		path.join(packageRoot, 'build', 'Release', bindingName),
-
-		// CWD-relative paths
-		path.join(process.cwd(), 'dist', 'build', 'Release', bindingName),
-		path.join(process.cwd(), 'build', 'Release', bindingName),
-
-		// Node modules paths (for when package is a dependency)
-		...Array.from({ length: 3 }, (_, i) => [path.join(process.cwd(), ...Array(i).fill('..'), 'node_modules', '@lawlzer', 'cashew', 'dist', 'build', 'Release', bindingName), path.join(process.cwd(), ...Array(i).fill('..'), 'node_modules', '@lawlzer', 'cashew', 'build', 'Release', bindingName)]).flat(),
-	];
-
-	// Bun-specific optimizations
-	if (typeof Bun !== 'undefined') {
-		try {
-			const fs = dynamicRequire('fs');
-			// Try direct dlopen for existing files in Bun
-			for (const bindingPath of paths) {
-				if (fs.existsSync(bindingPath)) {
-					try {
-						const mod = { exports: {} };
-						process.dlopen(mod, bindingPath);
-						return mod.exports;
-					} catch (err) {
-						console.warn(`Failed to dlopen ${bindingPath}:`, err);
-					}
-				}
+	for (const fileName of nativeFileNames()) {
+		paths.push(fileName);
+		for (const root of roots) {
+			for (const relativeDir of relativeDirs) {
+				paths.push(path.join(root, relativeDir, fileName));
 			}
-		} catch {
-			// fs not available
 		}
 	}
 
-	// Standard require attempts
+	return [...new Set(paths)];
+}
+
+let cachedNativeAddon: NativeAddon | null = null;
+
+function loadNativeAddon(): NativeAddon {
+	if (cachedNativeAddon !== null) return cachedNativeAddon;
+
 	const errors: string[] = [];
-	for (const bindingPath of [...new Set(paths)]) {
+
+	for (const packageName of optionalNativePackages()) {
 		try {
-			return requireFunction(bindingPath);
-		} catch (err) {
-			if (err instanceof Error && !err.message.includes('Cannot find module')) {
-				errors.push(`${bindingPath}: ${err.message}`);
+			cachedNativeAddon = requireFunction(packageName) as NativeAddon;
+			return cachedNativeAddon;
+		} catch (error) {
+			if (error instanceof Error && !error.message.includes('Cannot find module')) {
+				errors.push(`${packageName}: ${error.message}`);
 			}
 		}
 	}
 
-	// Provide helpful error message
-	throwError(`Could not load ${name} binding.\n` + `Searched paths:\n${[...new Set(paths)].map((p) => `  - ${p}`).join('\n')}\n\n` + `Errors:\n${errors.length > 0 ? errors.join('\n') : 'No specific errors captured'}\n\n` + `Make sure the native bindings are built (npm run build:cpp) and the package is properly installed.`);
-}
-
-// Define schemas using Valibot - using any for now to simplify
-const functionSchema = v.any();
-
-export const screenSchema = v.object({
-	getWindowPixels: functionSchema,
-	getScreenPixels: functionSchema,
-});
-
-export const keyboardSchema = v.object({
-	holdKey: functionSchema,
-	releaseKey: functionSchema,
-	holdKeys: functionSchema,
-	releaseKeys: functionSchema,
-	isKeyPressed: functionSchema,
-	type: functionSchema,
-	tapKey: functionSchema,
-	holdKeyForDuration: functionSchema,
-	stopAllHoldKeys: functionSchema,
-});
-
-export const mouseSchema = v.object({
-	click: functionSchema,
-	clickMessage: functionSchema,
-	getPosition: functionSchema,
-	hold: functionSchema,
-	release: functionSchema,
-	moveRelative: functionSchema,
-	moveRelativePolar: functionSchema,
-	setPosition: functionSchema,
-});
-
-export const miscSchema = v.object({
-	SetForegroundWindow: functionSchema,
-	GetForegroundWindowTitle: functionSchema,
-});
-
-export const clipboardSchema = v.object({
-	ReadClipboard: functionSchema,
-	WriteClipboard: functionSchema,
-	ClipboardPaste: functionSchema,
-});
-
-export const screenRawSchema = v.object({
-	setSquare: functionSchema,
-	clearSquare: functionSchema,
-});
-
-export const panicShutdownSchema = v.object({
-	enablePanicShutdown: functionSchema,
-});
-
-export const keyboardHooksSchema = v.object({
-	registerKeyListener: functionSchema,
-	stopAllKeyboardHooks: functionSchema,
-});
-
-export const keyboardSyncSchema = v.object({
-	isKeyPressedSync: functionSchema,
-	areKeysPressed: functionSchema,
-	getPressedKeys: functionSchema,
-	sendKeyBatch: functionSchema,
-	getRawKeyState: functionSchema,
-	isKeyPressedAlt: functionSchema,
-});
-
-// Create a typed binding loader that validates at runtime
-export function loadBinding<T>(bindingName: string, schema: v.GenericSchema<T>): T {
-	const rawBinding = loadNativeBinding(bindingName);
-
-	// Validate the binding structure
-	const result = v.safeParse(schema, rawBinding);
-
-	if (!result.success) {
-		const issues = result.issues.map((issue) => issue.message).join(', ');
-		throwError(`${bindingName} binding validation failed: ${issues}`);
-	}
-
-	// Create proxy to add error handling to each function
-	const binding = result.output as any;
-	const proxiedBinding: any = {};
-
-	// List of functions that should NOT be wrapped as async
-	// These functions return synchronous values like cleanup functions
-	const syncFunctions = ['registerKeyListener', 'stopAllHoldKeys', 'isKeyPressedSync', 'areKeysPressed', 'getPressedKeys', 'sendKeyBatch', 'getRawKeyState', 'isKeyPressedAlt'];
-
-	for (const [key, value] of Object.entries(binding)) {
-		if (typeof value === 'function') {
-			if (syncFunctions.includes(key)) {
-				// Keep synchronous functions as-is, just add error handling
-				proxiedBinding[key] = (...args: any[]): any => {
-					try {
-						// eslint-disable-next-line @typescript-eslint/no-unsafe-return
-						return value(...args);
-					} catch (error) {
-						const message = error instanceof Error ? error.message : String(error);
-						throwError(`${bindingName}.${key} failed: ${message}`);
-					}
-				};
-			} else {
-				// Wrap other functions as async
-				proxiedBinding[key] = async (...args: any[]): Promise<any> => {
-					try {
-						// eslint-disable-next-line @typescript-eslint/no-unsafe-return
-						return await value(...args);
-					} catch (error) {
-						const message = error instanceof Error ? error.message : String(error);
-						throwError(`${bindingName}.${key} failed: ${message}`);
-					}
-				};
+	for (const bindingPath of candidateNativePaths()) {
+		try {
+			cachedNativeAddon = requireFunction(bindingPath) as NativeAddon;
+			return cachedNativeAddon;
+		} catch (error) {
+			if (error instanceof Error && !error.message.includes('Cannot find module')) {
+				errors.push(`${bindingPath}: ${error.message}`);
 			}
-		} else {
-			proxiedBinding[key] = value;
 		}
 	}
 
-	return proxiedBinding as T;
+	throwError(
+		`Could not load cashew native binding.\n` +
+			`Searched packages:\n${optionalNativePackages()
+				.map((p) => `  - ${p}`)
+				.join('\n')}\n` +
+			`Searched paths:\n${candidateNativePaths()
+				.map((p) => `  - ${p}`)
+				.join('\n')}\n\n` +
+			`Errors:\n${errors.length > 0 ? errors.join('\n') : 'No specific errors captured'}\n\n` +
+			`Make sure the Rust native binding is built (npm run build:native).`
+	);
 }
 
-// Export type utilities - define the types manually
+export const bindingFunctionNames = {
+	screen: ['getWindowPixels', 'getScreenPixels'],
+	keyboard: ['holdKey', 'releaseKey', 'holdKeys', 'releaseKeys', 'isKeyPressed', 'type', 'tapKey', 'holdKeyForDuration', 'stopAllHoldKeys'],
+	mouse: ['click', 'clickMessage', 'getPosition', 'hold', 'release', 'moveRelative', 'moveRelativePolar', 'setPosition'],
+	misc: ['SetForegroundWindow', 'GetForegroundWindowTitle'],
+	clipboard: ['ReadClipboard', 'WriteClipboard', 'ClipboardPaste'],
+	screenRaw: ['setSquare', 'clearSquare'],
+	panicShutdown: ['enablePanicShutdown'],
+	keyboardHooks: ['registerKeyListener', 'stopAllKeyboardHooks'],
+	keyboardSync: ['isKeyPressedSync', 'areKeysPressed', 'getPressedKeys', 'sendKeyBatch', 'getRawKeyState', 'isKeyPressedAlt'],
+} as const;
+
+export type BindingName = keyof typeof bindingFunctionNames;
+
+const syncFunctions = new Set<string>(['registerKeyListener', 'stopAllKeyboardHooks', 'stopAllHoldKeys', 'isKeyPressedSync', 'areKeysPressed', 'getPressedKeys', 'sendKeyBatch', 'getRawKeyState', 'isKeyPressedAlt']);
+
+function getNativeFunction(functionName: string): NativeFunction {
+	const value = loadNativeAddon()[functionName];
+	if (typeof value !== 'function') {
+		throwError(`cashew native binding is missing function: ${functionName}`);
+	}
+	return value as NativeFunction;
+}
+
+function callNative(bindingName: string, functionName: string, args: unknown[]): unknown {
+	try {
+		return getNativeFunction(functionName)(...args);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throwError(`${bindingName}.${functionName} failed: ${message}`);
+	}
+}
+
+function createBindingFunction(bindingName: string, functionName: string): NativeFunction {
+	if (bindingName === 'keyboardHooks' && functionName === 'registerKeyListener') {
+		return (...args: unknown[]) => {
+			const listenerId = callNative(bindingName, functionName, args);
+			if (typeof listenerId !== 'number') {
+				throwError(`keyboardHooks.registerKeyListener returned invalid listener id: ${String(listenerId)}`);
+			}
+
+			return (): void => {
+				callNative(bindingName, 'unregisterKeyListener', [listenerId]);
+			};
+		};
+	}
+
+	if (syncFunctions.has(functionName)) {
+		return (...args: unknown[]) => callNative(bindingName, functionName, args);
+	}
+
+	return async (...args: unknown[]) => {
+		try {
+			return await callNative(bindingName, functionName, args);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			throwError(`${bindingName}.${functionName} failed: ${message}`);
+		}
+	};
+}
+
+export function loadBinding<T>(bindingName: BindingName): T {
+	const functionNames = bindingFunctionNames[bindingName];
+	if (functionNames === undefined) {
+		throwError(`Unknown cashew native binding: ${bindingName}`);
+	}
+
+	const cache = new Map<string, NativeFunction>();
+	const functionNameSet = new Set<string>(functionNames);
+
+	return new Proxy(
+		{},
+		{
+			get(_target, prop) {
+				if (typeof prop !== 'string' || !functionNameSet.has(prop)) return undefined;
+				const cached = cache.get(prop);
+				if (cached !== undefined) return cached;
+
+				const fn = createBindingFunction(bindingName, prop);
+				cache.set(prop, fn);
+				return fn;
+			},
+			ownKeys() {
+				return [...functionNames];
+			},
+			getOwnPropertyDescriptor(_target, prop) {
+				if (typeof prop !== 'string' || !functionNameSet.has(prop)) return undefined;
+				return { enumerable: true, configurable: true };
+			},
+		}
+	) as T;
+}
+
 export interface ScreenBinding {
 	getWindowPixels: (windowTitle: string, x: number, y: number, width: number, height: number) => Promise<Buffer>;
 	getScreenPixels: (x: number, y: number, width: number, height: number) => Promise<Buffer>;

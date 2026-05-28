@@ -1,13 +1,12 @@
 import { throwError } from '@lawlzer/utils';
 
-import { loadBinding, type MiscBinding, miscSchema, type PanicShutdownBinding, panicShutdownSchema } from './bindingLoader';
+import { loadBinding, type MiscBinding, type PanicShutdownBinding } from './bindingLoader';
 import type { Key } from './keyboard';
 import { Keyboard, stringToKeycode } from './keyboard';
 import type { Area, rgb } from './screen';
 
-// Load the binding with the new Valibot-based loader
-const miscBinding = loadBinding<MiscBinding>('misc', miscSchema);
-const panicShutdownBinding = loadBinding<PanicShutdownBinding>('panicShutdown', panicShutdownSchema);
+const miscBinding = loadBinding<MiscBinding>('misc');
+const panicShutdownBinding = loadBinding<PanicShutdownBinding>('panicShutdown');
 
 export async function setForegroundWindow(windowTitle: string): Promise<boolean> {
 	return miscBinding.SetForegroundWindow(windowTitle);

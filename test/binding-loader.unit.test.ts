@@ -1,155 +1,38 @@
-import * as v from 'valibot';
+import { bindingFunctionNames, type ClipboardBinding, type KeyboardBinding, loadBinding } from '../src/utils/bindingLoader';
 
-import { clipboardSchema, keyboardHooksSchema, keyboardSchema, keyboardSyncSchema, miscSchema, mouseSchema, panicShutdownSchema, screenRawSchema, screenSchema } from '../src/utils/bindingLoader';
-
-describe('Binding schemas', () => {
-	describe('screenSchema', () => {
-		test('validates object with required functions', () => {
-			const valid = {
-				getWindowPixels: () => {},
-				getScreenPixels: () => {},
-			};
-			const result = v.safeParse(screenSchema, valid);
-			expect(result.success).toBe(true);
-		});
-
-		test('rejects object missing required functions', () => {
-			const invalid = { getWindowPixels: () => {} };
-			const result = v.safeParse(screenSchema, invalid);
-			expect(result.success).toBe(false);
-		});
+describe('bindingFunctionNames', () => {
+	test('defines the screen binding surface', () => {
+		expect(bindingFunctionNames.screen).toEqual(['getWindowPixels', 'getScreenPixels']);
 	});
 
-	describe('keyboardSchema', () => {
-		test('validates complete keyboard binding', () => {
-			const valid = {
-				holdKey: () => {},
-				releaseKey: () => {},
-				holdKeys: () => {},
-				releaseKeys: () => {},
-				isKeyPressed: () => {},
-				type: () => {},
-				tapKey: () => {},
-				holdKeyForDuration: () => {},
-				stopAllHoldKeys: () => {},
-			};
-			const result = v.safeParse(keyboardSchema, valid);
-			expect(result.success).toBe(true);
-		});
-
-		test('rejects incomplete keyboard binding', () => {
-			const invalid = { holdKey: () => {}, releaseKey: () => {} };
-			const result = v.safeParse(keyboardSchema, invalid);
-			expect(result.success).toBe(false);
-		});
+	test('defines the keyboard binding surface', () => {
+		expect(bindingFunctionNames.keyboard).toEqual(['holdKey', 'releaseKey', 'holdKeys', 'releaseKeys', 'isKeyPressed', 'type', 'tapKey', 'holdKeyForDuration', 'stopAllHoldKeys']);
 	});
 
-	describe('mouseSchema', () => {
-		test('validates complete mouse binding', () => {
-			const valid = {
-				click: () => {},
-				clickMessage: () => {},
-				getPosition: () => {},
-				hold: () => {},
-				release: () => {},
-				moveRelative: () => {},
-				moveRelativePolar: () => {},
-				setPosition: () => {},
-			};
-			const result = v.safeParse(mouseSchema, valid);
-			expect(result.success).toBe(true);
-		});
+	test('defines all native binding groups', () => {
+		expect(Object.keys(bindingFunctionNames).sort()).toEqual(['clipboard', 'keyboard', 'keyboardHooks', 'keyboardSync', 'misc', 'mouse', 'panicShutdown', 'screen', 'screenRaw'].sort());
 	});
 
-	describe('miscSchema', () => {
-		test('validates complete misc binding', () => {
-			const valid = {
-				SetForegroundWindow: () => {},
-				GetForegroundWindowTitle: () => {},
-			};
-			const result = v.safeParse(miscSchema, valid);
-			expect(result.success).toBe(true);
-		});
-	});
-
-	describe('clipboardSchema', () => {
-		test('validates complete clipboard binding', () => {
-			const valid = {
-				ReadClipboard: () => {},
-				WriteClipboard: () => {},
-				ClipboardPaste: () => {},
-			};
-			const result = v.safeParse(clipboardSchema, valid);
-			expect(result.success).toBe(true);
-		});
-	});
-
-	describe('screenRawSchema', () => {
-		test('validates complete screenRaw binding', () => {
-			const valid = {
-				setSquare: () => {},
-				clearSquare: () => {},
-			};
-			const result = v.safeParse(screenRawSchema, valid);
-			expect(result.success).toBe(true);
-		});
-	});
-
-	describe('panicShutdownSchema', () => {
-		test('validates complete panicShutdown binding', () => {
-			const valid = { enablePanicShutdown: () => {} };
-			const result = v.safeParse(panicShutdownSchema, valid);
-			expect(result.success).toBe(true);
-		});
-	});
-
-	describe('keyboardHooksSchema', () => {
-		test('validates complete keyboardHooks binding', () => {
-			const valid = {
-				registerKeyListener: () => {},
-				stopAllKeyboardHooks: () => {},
-			};
-			const result = v.safeParse(keyboardHooksSchema, valid);
-			expect(result.success).toBe(true);
-		});
-	});
-
-	describe('keyboardSyncSchema', () => {
-		test('validates complete keyboardSync binding', () => {
-			const valid = {
-				isKeyPressedSync: () => {},
-				areKeysPressed: () => {},
-				getPressedKeys: () => {},
-				sendKeyBatch: () => {},
-				getRawKeyState: () => {},
-				isKeyPressedAlt: () => {},
-			};
-			const result = v.safeParse(keyboardSyncSchema, valid);
-			expect(result.success).toBe(true);
-		});
-
-		test('rejects incomplete keyboardSync binding', () => {
-			const invalid = { isKeyPressedSync: () => {} };
-			const result = v.safeParse(keyboardSyncSchema, invalid);
-			expect(result.success).toBe(false);
-		});
+	test('keeps PascalCase clipboard exports for compatibility', () => {
+		expect(bindingFunctionNames.clipboard).toEqual(['ReadClipboard', 'WriteClipboard', 'ClipboardPaste']);
 	});
 });
 
 describe('loadBinding proxy behavior', () => {
-	// We can't test loadBinding directly (it requires native modules),
-	// but we can test the proxy wrapping logic by importing the schema
-	// validation patterns
+	test('creates lazy binding functions without loading native addon at import time', () => {
+		const keyboard = loadBinding<KeyboardBinding>('keyboard');
 
-	test('all schemas are valid valibot object schemas', () => {
-		const schemas = [screenSchema, keyboardSchema, mouseSchema, miscSchema, clipboardSchema, screenRawSchema, panicShutdownSchema, keyboardHooksSchema, keyboardSyncSchema];
+		expect(typeof keyboard.holdKey).toBe('function');
+		expect(typeof keyboard.releaseKey).toBe('function');
+		expect(Object.keys(keyboard)).toEqual([...bindingFunctionNames.keyboard]);
+	});
 
-		for (const schema of schemas) {
-			// Each schema should successfully validate a matching object
-			expect(schema).toBeDefined();
-			// Verify it's a valibot schema by checking it works with safeParse
-			const emptyResult = v.safeParse(schema, {});
-			expect(emptyResult.success).toBe(false); // Empty object should fail
-		}
+	test('creates independent proxies for different binding groups', () => {
+		const keyboard = loadBinding<KeyboardBinding>('keyboard');
+		const clipboard = loadBinding<ClipboardBinding>('clipboard');
+
+		expect(typeof keyboard.tapKey).toBe('function');
+		expect(typeof clipboard.ReadClipboard).toBe('function');
+		expect('tapKey' in clipboard).toBe(false);
 	});
 });

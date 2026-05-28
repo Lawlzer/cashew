@@ -1,11 +1,10 @@
 import { throwError } from '@lawlzer/utils';
 
-import { loadBinding, type ScreenRawBinding, screenRawSchema } from './bindingLoader';
+import { loadBinding, type ScreenRawBinding } from './bindingLoader';
 import type { Position } from './misc';
 import type { rgb } from './screen';
 
-// Load the binding with the new Valibot-based loader
-const screenRawBinding = loadBinding<ScreenRawBinding>('screenRaw', screenRawSchema);
+const screenRawBinding = loadBinding<ScreenRawBinding>('screenRaw');
 
 export class ScreenRaw {
 	/**

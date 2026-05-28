@@ -14,6 +14,7 @@ out
 output
 zig-out
 zig-cache
+target
 serverOutput
 coverage
 routeTypes

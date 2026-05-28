@@ -11,7 +11,7 @@ describe('Build System', () => {
 
 		// Ensure we start with a clean state
 		await execAsync('npm run clean');
-	});
+	}, 30000);
 
 	describe('Parallel Build', () => {
 		test('should complete clean build successfully', async () => {
@@ -21,11 +21,11 @@ describe('Build System', () => {
 
 			expect(stdout).toContain('Build completed successfully');
 			expect(stderr).toBe('');
-			expect(duration).toBeLessThan(20); // Should complete in under 20 seconds
-		}, 30000);
+			expect(duration).toBeLessThan(90);
+		}, 120000);
 
 		test('should create all expected output files', async () => {
-			const expectedFiles = ['dist/index.js', 'dist/index.cjs', 'dist/index.d.ts', 'dist/index.d.ts.map', 'dist/build/Release/clipboard.node', 'dist/build/Release/keyboard.node', 'dist/build/Release/mouse.node', 'dist/build/Release/screen.node', 'dist/build/Release/screenRaw.node', 'dist/build/Release/misc.node', 'dist/build/Release/panicShutdown.node'];
+			const expectedFiles = ['dist/index.js', 'dist/index.cjs', 'dist/index.d.ts', 'dist/index.d.ts.map', 'dist/build/Release/cashew.node'];
 
 			for (const file of expectedFiles) {
 				const exists = await fs
@@ -41,29 +41,33 @@ describe('Build System', () => {
 			const { stdout } = await execAsync('npm run build');
 			const duration = (Date.now() - startTime) / 1000;
 
-			expect(stdout).toContain('C++ build cache is valid');
+			expect(stdout).toContain('Rust build cache is valid');
 			expect(stdout).toContain('Build completed successfully');
-			expect(duration).toBeLessThan(5); // Incremental build should be fast
-		}, 10000);
+			expect(duration).toBeLessThan(10);
+		}, 20000);
 	});
 
 	describe('Build Output', () => {
 		test('should generate valid TypeScript declarations', async () => {
-			const declarationContent = await fs.readFile('dist/index.d.ts', 'utf-8');
+			const indexDeclaration = await fs.readFile('dist/index.d.ts', 'utf-8');
+			const keyboardDeclaration = await fs.readFile('dist/utils/keyboard.d.ts', 'utf-8');
+			const mouseDeclaration = await fs.readFile('dist/utils/mouse.d.ts', 'utf-8');
+			const screenDeclaration = await fs.readFile('dist/utils/screen.d.ts', 'utf-8');
+			const clipboardDeclaration = await fs.readFile('dist/utils/clipboard.d.ts', 'utf-8');
 
 			// Check for expected class declarations
-			expect(declarationContent).toContain('declare class Keyboard');
-			expect(declarationContent).toContain('declare class Mouse');
-			expect(declarationContent).toContain('declare class Screen');
-			expect(declarationContent).toContain('declare class Clipboard');
+			expect(keyboardDeclaration).toContain('declare class Keyboard');
+			expect(mouseDeclaration).toContain('declare class Mouse');
+			expect(screenDeclaration).toContain('declare class Screen');
+			expect(clipboardDeclaration).toContain('declare class Clipboard');
 
 			// Check for static methods
-			expect(declarationContent).toContain('static onKeypress');
-			expect(declarationContent).toContain('static getAllKeypresses');
-			expect(declarationContent).toContain('static stopAllKeyboardListeners');
+			expect(keyboardDeclaration).toContain('static onKeypress');
+			expect(keyboardDeclaration).toContain('static getAllKeypresses');
+			expect(keyboardDeclaration).toContain('static stopAllKeyboardListeners');
 
 			// Check for exports
-			expect(declarationContent).toContain('export {');
+			expect(indexDeclaration).toContain("export * from './utils/keyboard'");
 		});
 
 		test('should generate both ESM and CJS outputs', async () => {
@@ -77,19 +81,12 @@ describe('Build System', () => {
 			expect(cjsContent).toContain('exports');
 		});
 
-		test('should copy all native bindings', async () => {
+		test('should copy the native binding', async () => {
 			const nativeDir = 'dist/build/Release';
 			const files = await fs.readdir(nativeDir);
 			const nodeFiles = files.filter((f) => f.endsWith('.node'));
 
-			expect(nodeFiles.length).toBe(7);
-			expect(nodeFiles).toContain('clipboard.node');
-			expect(nodeFiles).toContain('keyboard.node');
-			expect(nodeFiles).toContain('mouse.node');
-			expect(nodeFiles).toContain('screen.node');
-			expect(nodeFiles).toContain('screenRaw.node');
-			expect(nodeFiles).toContain('misc.node');
-			expect(nodeFiles).toContain('panicShutdown.node');
+			expect(nodeFiles).toEqual(['cashew.node']);
 		});
 	});
 
@@ -107,7 +104,7 @@ describe('Build System', () => {
 				.then(() => true)
 				.catch(() => false);
 			expect(indexExists).toBe(true);
-		}, 30000);
+		}, 120000);
 
 		test('individual build steps should work', async () => {
 			// Test types build

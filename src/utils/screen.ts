@@ -1,6 +1,6 @@
 import { ensureDirectoryExists, throwError } from '@lawlzer/utils';
 
-import { loadBinding, type ScreenBinding, screenSchema } from './bindingLoader';
+import { loadBinding, type ScreenBinding } from './bindingLoader';
 import { Config } from './config';
 import { isCorrectColour, type Position } from './misc';
 
@@ -33,8 +33,7 @@ async function getSharp(): Promise<Sharp> {
 	return sharpLoadingPromise;
 }
 
-// Load the bindings with the new Valibot-based loader
-const screenBinding = loadBinding<ScreenBinding>('screen', screenSchema);
+const screenBinding = loadBinding<ScreenBinding>('screen');
 
 export interface rgb {
 	r: number;
