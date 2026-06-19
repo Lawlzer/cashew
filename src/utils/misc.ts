@@ -8,14 +8,30 @@ import type { Area, rgb } from './screen';
 const miscBinding = loadBinding<MiscBinding>('misc');
 const panicShutdownBinding = loadBinding<PanicShutdownBinding>('panicShutdown');
 
+type GlobalWithMiscBindingOverride = typeof globalThis & {
+	__cashewMiscBindingOverride?: MiscBinding;
+};
+
+function getMiscBinding(): MiscBinding {
+	return (globalThis as GlobalWithMiscBindingOverride).__cashewMiscBindingOverride ?? miscBinding;
+}
+
 export async function setForegroundWindow(windowTitle: string): Promise<boolean> {
-	return miscBinding.SetForegroundWindow(windowTitle);
+	return getMiscBinding().SetForegroundWindow(windowTitle);
 }
 
 export async function getForegroundWindowTitle(): Promise<string> {
-	const result = await miscBinding.GetForegroundWindowTitle();
-	if (result === null) throwError('Failed to get foreground window title');
-	return result;
+	try {
+		const result = await getMiscBinding().GetForegroundWindowTitle();
+		if (result === null) {
+			console.warn('Failed to get foreground window title');
+			return '';
+		}
+		return result;
+	} catch (error) {
+		console.warn('Failed to get foreground window title', error);
+		return '';
+	}
 }
 
 export interface Position {

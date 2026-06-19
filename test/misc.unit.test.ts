@@ -1,6 +1,28 @@
 import type { Position } from '../src/utils/misc';
-import { getAreaOfPositions, isCorrectColour, randomBellCurve } from '../src/utils/misc';
+import { getAreaOfPositions, getForegroundWindowTitle, isCorrectColour, randomBellCurve } from '../src/utils/misc';
 import type { rgb } from '../src/utils/screen';
+
+interface MiscBindingOverride {
+	SetForegroundWindow: (windowTitle: string) => Promise<boolean>;
+	GetForegroundWindowTitle: () => Promise<string | null>;
+}
+
+type GlobalWithMiscBindingOverride = typeof globalThis & {
+	__cashewMiscBindingOverride?: MiscBindingOverride;
+};
+
+const globalWithMiscBindingOverride = globalThis as GlobalWithMiscBindingOverride;
+
+function withMiscBindingOverride(binding: MiscBindingOverride): void {
+	globalWithMiscBindingOverride.__cashewMiscBindingOverride = binding;
+}
+
+const originalConsoleWarn = console.warn;
+
+afterEach(() => {
+	delete globalWithMiscBindingOverride.__cashewMiscBindingOverride;
+	console.warn = originalConsoleWarn;
+});
 
 describe('isCorrectColour', () => {
 	test('returns true for identical colours with zero offset', () => {
@@ -152,5 +174,55 @@ describe('randomBellCurve', () => {
 		// With a bell curve, the average should be close to the midpoint
 		expect(average).toBeGreaterThan(35);
 		expect(average).toBeLessThan(65);
+	});
+});
+
+describe('getForegroundWindowTitle', () => {
+	test('returns binding result without warning when title lookup succeeds', async () => {
+		const warnCalls: unknown[][] = [];
+		console.warn = (...args: unknown[]) => {
+			warnCalls.push(args);
+		};
+
+		withMiscBindingOverride({
+			SetForegroundWindow: async () => true,
+			GetForegroundWindowTitle: async () => 'Path of Exile 2',
+		});
+
+		await expect(getForegroundWindowTitle()).resolves.toBe('Path of Exile 2');
+		expect(warnCalls).toEqual([]);
+	});
+
+	test('returns empty string and warns when binding returns null', async () => {
+		const warnCalls: unknown[][] = [];
+		console.warn = (...args: unknown[]) => {
+			warnCalls.push(args);
+		};
+
+		withMiscBindingOverride({
+			SetForegroundWindow: async () => true,
+			GetForegroundWindowTitle: async () => null,
+		});
+
+		await expect(getForegroundWindowTitle()).resolves.toBe('');
+		expect(warnCalls).toEqual([['Failed to get foreground window title']]);
+	});
+
+	test('returns empty string and warns when binding rejects', async () => {
+		const warnCalls: unknown[][] = [];
+		const error = new Error('misc.GetForegroundWindowTitle failed: Failed to get foreground window title');
+		console.warn = (...args: unknown[]) => {
+			warnCalls.push(args);
+		};
+
+		withMiscBindingOverride({
+			SetForegroundWindow: async () => true,
+			GetForegroundWindowTitle: async () => {
+				throw error;
+			},
+		});
+
+		await expect(getForegroundWindowTitle()).resolves.toBe('');
+		expect(warnCalls).toEqual([['Failed to get foreground window title', error]]);
 	});
 });
