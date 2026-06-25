@@ -23,13 +23,10 @@ export async function setForegroundWindow(windowTitle: string): Promise<boolean>
 export async function getForegroundWindowTitle(): Promise<string> {
 	try {
 		const result = await getMiscBinding().GetForegroundWindowTitle();
-		if (result === null) {
-			console.warn('Failed to get foreground window title');
-			return '';
-		}
+		if (result === null) return '';
 		return result;
 	} catch (error) {
-		console.warn('Failed to get foreground window title', error);
+		console.warn(`Failed to get foreground window title: ${error instanceof Error ? error.message : String(error)}`);
 		return '';
 	}
 }

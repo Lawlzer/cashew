@@ -193,7 +193,7 @@ describe('getForegroundWindowTitle', () => {
 		expect(warnCalls).toEqual([]);
 	});
 
-	test('returns empty string and warns when binding returns null', async () => {
+	test('returns empty string without warning when binding returns null', async () => {
 		const warnCalls: unknown[][] = [];
 		console.warn = (...args: unknown[]) => {
 			warnCalls.push(args);
@@ -205,7 +205,22 @@ describe('getForegroundWindowTitle', () => {
 		});
 
 		await expect(getForegroundWindowTitle()).resolves.toBe('');
-		expect(warnCalls).toEqual([['Failed to get foreground window title']]);
+		expect(warnCalls).toEqual([]);
+	});
+
+	test('returns empty string without warning when binding returns an empty title', async () => {
+		const warnCalls: unknown[][] = [];
+		console.warn = (...args: unknown[]) => {
+			warnCalls.push(args);
+		};
+
+		withMiscBindingOverride({
+			SetForegroundWindow: async () => true,
+			GetForegroundWindowTitle: async () => '',
+		});
+
+		await expect(getForegroundWindowTitle()).resolves.toBe('');
+		expect(warnCalls).toEqual([]);
 	});
 
 	test('returns empty string and warns when binding rejects', async () => {
@@ -223,6 +238,6 @@ describe('getForegroundWindowTitle', () => {
 		});
 
 		await expect(getForegroundWindowTitle()).resolves.toBe('');
-		expect(warnCalls).toEqual([['Failed to get foreground window title', error]]);
+		expect(warnCalls).toEqual([['Failed to get foreground window title: misc.GetForegroundWindowTitle failed: Failed to get foreground window title']]);
 	});
 });

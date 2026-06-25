@@ -1,22 +1,23 @@
-use std::ffi::CString;
 use std::ptr::null;
 use std::sync::Once;
 
 use napi::{Error, Result, Status};
-use windows_sys::Win32::Foundation::{GetLastError, HWND};
+use windows_sys::Win32::Foundation::{GetLastError, SetLastError, HWND};
 use windows_sys::Win32::Graphics::Gdi::{
     DeleteDC, DeleteObject, GetDC, ReleaseDC, HBITMAP, HDC, HGDIOBJ,
 };
 use windows_sys::Win32::UI::HiDpi::{
-    SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_SYSTEM_AWARE,
+    SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
-use windows_sys::Win32::UI::WindowsAndMessaging::{FindWindowA, GetForegroundWindow};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    FindWindowW, GetForegroundWindow, GetWindowTextLengthW, GetWindowTextW,
+};
 
 static DPI_INIT: Once = Once::new();
 
 pub fn init_dpi_awareness() {
     DPI_INIT.call_once(|| unsafe {
-        let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
+        let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     });
 }
 
@@ -39,18 +40,19 @@ where
         .map_err(|err| error(format!("Native worker panicked or was cancelled: {err}")))?
 }
 
-pub fn c_string(value: &str, label: &str) -> Result<CString> {
-    CString::new(value).map_err(|_| error(format!("{label} contains an embedded NUL byte")))
+pub fn ensure_no_nul(value: &str, label: &str) -> Result<()> {
+    if value.encode_utf16().any(|unit| unit == 0) {
+        return Err(error(format!("{label} contains an embedded NUL byte")));
+    }
+    Ok(())
 }
 
 pub fn find_window(title: &str) -> Result<HWND> {
-    let title = c_string(title, "windowTitle")?;
-    let hwnd = unsafe { FindWindowA(null(), title.as_ptr().cast()) };
+    ensure_no_nul(title, "windowTitle")?;
+    let wide_title = wide_null(title);
+    let hwnd = unsafe { FindWindowW(null(), wide_title.as_ptr()) };
     if is_null_handle(hwnd) {
-        return Err(error(format!(
-            "Window not found: {}",
-            title.to_string_lossy()
-        )));
+        return Err(error(format!("Window not found: {title}")));
     }
     Ok(hwnd)
 }
@@ -81,6 +83,45 @@ pub fn raw_to_hwnd(raw: isize) -> HWND {
 
 pub fn wide_null(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+pub fn wide_slice_to_string(value: &[u16]) -> String {
+    let end = value
+        .iter()
+        .position(|unit| *unit == 0)
+        .unwrap_or(value.len());
+    String::from_utf16_lossy(&value[..end])
+}
+
+pub fn get_window_title(hwnd: HWND) -> Result<String> {
+    unsafe {
+        SetLastError(0);
+    }
+    let len = unsafe { GetWindowTextLengthW(hwnd) };
+    if len <= 0 {
+        let code = unsafe { GetLastError() };
+        if code != 0 {
+            return Err(error(format!(
+                "Failed to get window title length (Error: {code})"
+            )));
+        }
+        return Ok(String::new());
+    }
+
+    let mut buffer = vec![0u16; len as usize + 1];
+    unsafe {
+        SetLastError(0);
+    }
+    let copied = unsafe { GetWindowTextW(hwnd, buffer.as_mut_ptr(), buffer.len() as i32) };
+    if copied <= 0 {
+        let code = unsafe { GetLastError() };
+        if code != 0 {
+            return Err(error(format!("Failed to get window title (Error: {code})")));
+        }
+        return Ok(String::new());
+    }
+
+    Ok(wide_slice_to_string(&buffer[..copied as usize]))
 }
 
 pub fn colorref(r: u8, g: u8, b: u8) -> u32 {

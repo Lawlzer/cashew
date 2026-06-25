@@ -1,10 +1,12 @@
 use napi::Result;
 use napi_derive::napi;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetForegroundWindow, GetWindowTextA, SetForegroundWindow as WinSetForegroundWindow,
+    GetForegroundWindow, SetForegroundWindow as WinSetForegroundWindow,
 };
 
-use crate::common::{error, find_window, init_dpi_awareness, is_null_handle, run_blocking};
+use crate::common::{
+    find_window, get_window_title, init_dpi_awareness, is_null_handle, run_blocking,
+};
 
 #[napi(js_name = "SetForegroundWindow")]
 pub async fn set_foreground_window(window_title: String) -> Result<bool> {
@@ -22,18 +24,11 @@ pub async fn get_foreground_window_title() -> Result<Option<String>> {
         init_dpi_awareness();
         let hwnd = unsafe { GetForegroundWindow() };
         if is_null_handle(hwnd) {
-            return Err(error("No foreground window found"));
+            return Ok(None);
         }
 
-        let mut buffer = [0u8; 256];
-        let len = unsafe { GetWindowTextA(hwnd, buffer.as_mut_ptr(), buffer.len() as i32) };
-        if len <= 0 {
-            return Err(error("Failed to get foreground window title"));
-        }
-
-        Ok(Some(
-            String::from_utf8_lossy(&buffer[..len as usize]).into_owned(),
-        ))
+        let title = get_window_title(hwnd)?;
+        Ok(Some(title))
     })
     .await
 }
